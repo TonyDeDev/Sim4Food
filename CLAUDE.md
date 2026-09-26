@@ -36,16 +36,27 @@ The swarm's advantage over plain forecasting: it handles **situations with no hi
 |---|---|
 | Backend | Python 3.11, FastAPI, Uvicorn |
 | Simulation | NumPy (vectorized agents), pandas; NetworkX optional for the friend network |
-| Frontend | React + Vite + TypeScript, Tailwind CSS |
-| Charts | Recharts (or Chart.js) |
+| Frontend | Next.js 16 (App Router) + React 19 + TypeScript, ESLint. Tailwind CSS planned, not installed yet |
+| Charts | Recharts (or Chart.js), not installed yet |
 | Animation | HTML Canvas with `requestAnimationFrame` |
+| Database | PostgreSQL via `pg` (`src/lib/db.ts`), connection string in `POSTGRES_URL` |
+| Hosting | Frontend on Vercel (Hobby plan). Python backend on a separate host because of Hobby function time limits |
 | LLM (stretch) | Claude API |
-| Storage | Files only (CSV/JSON); no database |
+| Storage | Demo dataset and uploads stay as CSV/JSON files; Postgres is being set up by a teammate (local Docker for now) |
+
+**Environment variables** (see `.env.example` and `backend/.env.example`; never commit real values):
+
+- `POSTGRES_URL`: Postgres connection string. Read by the Next.js app and by `backend/app/config.py`, which falls back to a temp local Docker URL.
+- `NEXT_PUBLIC_API_URL`: base URL of the FastAPI backend, also set in Vercel env vars.
+- `CORS_ORIGINS`: backend only, comma separated frontend origins (default `http://localhost:3000`).
+
+**Existing routes:** `GET /api/health` and `GET /api/db-health` in the Next.js app (`src/app/api/`).
 
 ## Repo structure
 
 ```
 backend/
+  app/config.py        env-based settings (POSTGRES_URL, CORS_ORIGINS)
   app/main.py          FastAPI routes
   sim/generator.py     demo restaurant dataset + hidden true demand
   sim/ingest.py        load + validate uploads
@@ -57,10 +68,13 @@ backend/
   sim/backtest.py      naive vs. recommended on held-out weeks
   sim/replay.py        event log of one representative run for the animation
   data/demo/           generated demo files
-frontend/
-  src/pages/           Setup, Upload, Waste, Planner, Results, Backtest
-  src/components/      SimView (animation), charts, tables
+src/                   Next.js app at the repo root (App Router)
+  app/                 pages and route handlers (app/api/*)
+  lib/db.ts            Postgres pool
+  components/          SimView (animation), charts, tables (planned)
 ```
+
+Planned pages: Setup, Upload, Waste, Planner, Results, Backtest.
 
 ## Data files
 
