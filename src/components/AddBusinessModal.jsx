@@ -10,7 +10,7 @@ function EditIcon() {
   return <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="m15 5 4 4M4 20l4.2-.9L19 8.3a2.1 2.1 0 0 0-3-3L5.2 16.1 4 20Z" /></svg>
 }
 
-export default function AddBusinessModal({ open, onClose, onSubmit, business = null }) {
+export default function AddBusinessModal({ open, onClose, onSubmit, business = null, mode = 'add' }) {
   const [name, setName] = useState('')
   const [type, setType] = useState('')
   const [location, setLocation] = useState('')
@@ -32,7 +32,7 @@ export default function AddBusinessModal({ open, onClose, onSubmit, business = n
     setFiles({ inventory: null, recipe: null, sales: null })
     setSuggestions([])
     setSuggestionsOpen(false)
-  }, [open, business])
+  }, [open, business, mode])
 
   useEffect(() => () => {
     clearTimeout(locationTimer.current)
@@ -41,7 +41,9 @@ export default function AddBusinessModal({ open, onClose, onSubmit, business = n
 
   if (!open) return null
 
-  const ready = name.trim() && type.trim() && location.trim() && (business || (files.inventory && files.recipe && files.sales))
+  const ready = mode === 'records'
+    ? Boolean(files.inventory || files.recipe || files.sales)
+    : Boolean(name.trim() && type.trim() && location.trim() && (business || (files.inventory && files.recipe && files.sales)))
 
   function reset() {
     clearTimeout(locationTimer.current)
@@ -107,6 +109,15 @@ export default function AddBusinessModal({ open, onClose, onSubmit, business = n
   function handleSubmit(e) {
     e.preventDefault()
     if (!ready) return
+    if (mode === 'records') {
+      onSubmit({
+        inventoryFile: files.inventory?.name || business?.inventoryFile,
+        recipeFile: files.recipe?.name || business?.recipeFile,
+        salesFile: files.sales?.name || business?.salesFile,
+      })
+      reset()
+      return
+    }
     onSubmit({
       name: name.trim(),
       type: type.trim(),
@@ -121,21 +132,22 @@ export default function AddBusinessModal({ open, onClose, onSubmit, business = n
   return (
     <div className="modal-overlay active" onClick={(e) => { if (e.target === e.currentTarget) handleClose() }}>
       <div className="modal" role="dialog" aria-modal="true" aria-labelledby="business-modal-title">
-        <h2 id="business-modal-title">{business ? 'Edit business' : 'Add a business'}</h2>
-        <p className="modal-sub">{business ? 'Update your business details or replace its records.' : 'Add your business details, then attach its records.'}</p>
+        <h2 id="business-modal-title">{mode === 'records' ? 'Update business records' : 'Add a business'}</h2>
+        <p className="modal-sub">{mode === 'records' ? `Replace the inventory, recipes, or POS file for ${business?.name}. Choose at least one file to save.` : 'Add your business details, then attach its records.'}</p>
 
         <form onSubmit={handleSubmit}>
-          <div className="field">
-            <label htmlFor="biz-name-input">Business name</label>
-            <input id="biz-name-input" type="text" placeholder="e.g. Millbrook Cafe" required value={name} onChange={(e) => setName(e.target.value)} autoFocus />
-          </div>
+          {mode === 'add' && <>
+            <div className="field">
+              <label htmlFor="biz-name-input">Business name</label>
+              <input id="biz-name-input" type="text" placeholder="e.g. Millbrook Cafe" required value={name} onChange={(e) => setName(e.target.value)} autoFocus />
+            </div>
 
-          <div className="field">
-            <label htmlFor="biz-type-input">Business type</label>
-            <input id="biz-type-input" type="text" placeholder="e.g. Restaurant, cafe, bakery" required value={type} onChange={(e) => setType(e.target.value)} />
-          </div>
+            <div className="field">
+              <label htmlFor="biz-type-input">Business type</label>
+              <input id="biz-type-input" type="text" placeholder="e.g. Restaurant, cafe, bakery" required value={type} onChange={(e) => setType(e.target.value)} />
+            </div>
 
-          <div className="field location-field" ref={locationRef}>
+            <div className="field location-field" ref={locationRef}>
             <label htmlFor="biz-location-input">Business location</label>
             <input
               id="biz-location-input"
@@ -166,7 +178,8 @@ export default function AddBusinessModal({ open, onClose, onSubmit, business = n
                 <small>Suggestions by Photon · © OpenStreetMap contributors</small>
               </div>
             )}
-          </div>
+            </div>
+          </>}
 
           {FIELDS.map(({ key, label, hint }) => (
             <div className="upload-field" key={key}>
@@ -176,7 +189,7 @@ export default function AddBusinessModal({ open, onClose, onSubmit, business = n
                 <span className={`file-name${files[key] ? ' chosen' : ''}`}>
                   {files[key] ? files[key].name : business?.[`${key}File`] || 'No file selected'}
                 </span>
-                <button type="button" className="btn-choose" onClick={() => fileInputRefs.current[key]?.click()}>
+              <button type="button" className="btn-choose" onClick={() => fileInputRefs.current[key]?.click()}>
                   {files[key] || business?.[`${key}File`] ? 'Replace file' : 'Choose file'}
                 </button>
               </div>
@@ -186,7 +199,7 @@ export default function AddBusinessModal({ open, onClose, onSubmit, business = n
 
           <div className="modal-actions">
             <button type="button" className="btn-outline-modal" onClick={handleClose}>Cancel</button>
-            <button type="submit" className="btn-submit-modal" disabled={!ready}>{business ? 'Save changes' : 'Add business'}</button>
+            <button type="submit" className="btn-submit-modal" disabled={!ready}>{mode === 'records' ? 'Save records' : 'Add business'}</button>
           </div>
         </form>
       </div>
