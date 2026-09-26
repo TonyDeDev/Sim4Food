@@ -47,7 +47,7 @@ async def post_upload(restaurant_id: str, file_type: str, file: UploadFile):
 
 @app.get("/api/waste")
 async def get_waste(restaurant_id: str):
-    return waste.compute_waste(restaurant_id)
+    return await waste.compute_waste(restaurant_id)
 
 
 @app.post("/api/simulate")
