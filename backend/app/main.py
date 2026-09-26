@@ -4,6 +4,7 @@ from fastapi import FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import db
+from app.config import settings
 from sim import backtest, generator, ingest, waste
 
 
@@ -18,7 +19,7 @@ app = FastAPI(title="SwarmStock API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=settings.cors_origin_list,
     allow_methods=["*"],
     allow_headers=["*"],
 )

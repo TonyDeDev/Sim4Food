@@ -36,31 +36,51 @@ The swarm's advantage over plain forecasting: it handles **situations with no hi
 |---|---|
 | Backend | Python 3.11, FastAPI, Uvicorn |
 | Simulation | NumPy (vectorized agents), pandas; NetworkX optional for the friend network |
-| Frontend | React + Vite + TypeScript, Tailwind CSS |
-| Charts | Recharts (or Chart.js) |
+| Frontend | Next.js 16 (App Router) + React 19 + TypeScript, ESLint, Tailwind CSS v4 |
+| Charts | Recharts (or Chart.js), not installed yet |
 | Animation | HTML Canvas with `requestAnimationFrame` |
+| Database | PostgreSQL via `pg` (`src/lib/db.ts`) on the frontend; via `asyncpg` (`backend/app/db.py`) on the backend |
+| Hosting | Frontend on Vercel (Hobby plan). Python backend on a separate host because of Hobby function time limits |
 | LLM (stretch) | Claude API |
-| Storage | PostgreSQL (see `db/schema.sql`); uploads seed it, `inventory_current` tracks running stock between uploads |
+| Storage | PostgreSQL (see `db/schema.sql`, run via `docker-compose.yml`); uploads seed it, `inventory_current` tracks running stock between uploads |
+
+**Environment variables** (see `.env.example` and `backend/.env.example`; never commit real values):
+
+- `POSTGRES_URL`: Postgres connection string for the Next.js app.
+- `NEXT_PUBLIC_API_URL`: base URL of the FastAPI backend, also set in Vercel env vars.
+- Backend Postgres connection is set via discrete vars (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT`) in `backend/app/config.py`, matching `docker-compose.yml`.
+- `CORS_ORIGINS`: backend only, comma separated frontend origins (default `http://localhost:3000`).
+
+**Existing routes:** `GET /api/health` and `GET /api/db-health` in the Next.js app (`src/app/api/`).
 
 ## Repo structure
 
 ```
+db/schema.sql           Postgres schema (restaurants, ingredients, sales, purchases, events, simulation_runs, ...)
+docker-compose.yml       local Postgres for backend dev
 backend/
-  app/main.py          FastAPI routes
-  sim/generator.py     demo restaurant dataset + hidden true demand
-  sim/ingest.py        load + validate uploads
-  sim/waste.py         historical waste and $ loss
-  sim/agents.py        agent traits, friend network, daily decisions
-  sim/calibrate.py     tune params to match history
-  sim/forecast.py      Monte Carlo -> ingredient demand distributions
-  sim/optimize.py      newsvendor, shelf-life cap, pack rounding
-  sim/backtest.py      naive vs. recommended on held-out weeks
-  sim/replay.py        event log of one representative run for the animation
-  data/demo/           generated demo files
-frontend/
-  src/pages/           Setup, Upload, Waste, Planner, Results, Backtest
-  src/components/      SimView (animation), charts, tables
+  app/config.py         env-based settings (Postgres vars, CORS_ORIGINS)
+  app/db.py             asyncpg connection pool
+  app/main.py           FastAPI routes
+  sim/generator.py      demo restaurant dataset + hidden true demand
+  sim/ingest.py         load + validate uploads
+  sim/workbook_import.py load a demo Excel workbook into pandas frames / export as CSVs
+  sim/explore.py        exploratory analysis of the demo data
+  sim/waste.py          historical waste and $ loss
+  sim/agents.py         agent traits, friend network, daily decisions
+  sim/calibrate.py      tune params to match history
+  sim/forecast.py       Monte Carlo -> ingredient demand distributions
+  sim/optimize.py       newsvendor, shelf-life cap, pack rounding
+  sim/backtest.py       naive vs. recommended on held-out weeks
+  sim/replay.py         event log of one representative run for the animation
+  data/demo/            generated demo files
+src/                    Next.js app at the repo root (App Router)
+  app/                  pages and route handlers (app/api/*)
+  lib/db.ts             Postgres pool
+  components/           SimView (animation), charts, tables (planned)
 ```
+
+Planned pages: Setup, Upload, Waste, Planner, Results, Backtest.
 
 ## Data files
 
@@ -125,3 +145,13 @@ frontend/
 | 24 | Pitch rehearsed twice; backup demo video recorded |
 
 **Cut order if behind:** stretch goals -> animation (keep counter + histogram) -> friend network -> automatic calibration (hand-tune) -> shelf-life cap. Never cut recommendations, savings number, or backtest.
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+# This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->
