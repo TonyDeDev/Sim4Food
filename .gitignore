@@ -45,3 +45,7 @@ next-env.d.ts
 __pycache__/
 *.pyc
 .venv/
+
+# vite (frontend-design)
+/dist
+*.local

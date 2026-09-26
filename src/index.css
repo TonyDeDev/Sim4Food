@@ -1,0 +1,76 @@
+:root {
+  --cream: #fff8ea;
+  --cream-deep: #f2e9d3;
+  --deep-green: #245c45;
+  --deep-green-hover: #1c4a37;
+  --fresh-green: #8cbf65;
+  --pastel-green: #bee3a8;
+  --pastel-green-hover: #a9d68c;
+  --ink: #26352d;
+  --ink-soft: rgba(38, 53, 45, 0.62);
+  --ink-faint: rgba(38, 53, 45, 0.4);
+  --hairline: rgba(36, 92, 69, 0.22);
+  --green-wash: #e6eee1;
+  --error: #b3402a;
+
+  box-sizing: border-box;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+html {
+  scroll-behavior: smooth;
+  scroll-padding-top: env(safe-area-inset-top, 0px);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: inherit;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--cream);
+  color: var(--ink);
+  font-family: Inter, Arial, sans-serif;
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Fraunces', Georgia, 'Times New Roman', serif;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input {
+  font-family: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--deep-green);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  * {
+    transition: none !important;
+  }
+}
