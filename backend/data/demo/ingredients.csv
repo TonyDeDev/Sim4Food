@@ -1,0 +1,13 @@
+ingredient_id,name,unit,unit_cost,pack_size,shelf_life_days
+chicken,Chicken breast,kg,11.5,5,4
+beef_patty,Beef patty 6oz,each,1.6,24,5
+fish_fillet,Cod fillet,kg,18.0,2,3
+romaine,Romaine lettuce,head,1.8,12,5
+tomato,Tomatoes,kg,3.5,5,6
+tortilla,Flour tortilla 12in,each,0.35,48,10
+bun,Brioche bun,each,0.45,24,5
+penne,Penne pasta (dry),kg,3.2,5,365
+cream,35% cream,L,5.5,4,7
+parmesan,Parmesan,kg,22.0,1,30
+fries_frozen,Frozen fries,kg,2.8,10,180
+cheddar,"Cheddar, shredded",kg,12.0,2,21

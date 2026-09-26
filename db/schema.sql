@@ -7,7 +7,7 @@ CREATE TYPE event_type AS ENUM ('holiday', 'deal');
 
 CREATE TABLE restaurants (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL,
+    name TEXT NOT NULL UNIQUE,
     timezone TEXT NOT NULL DEFAULT 'UTC',
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -22,23 +22,25 @@ CREATE TABLE users (
 CREATE TABLE ingredients (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    external_id TEXT NOT NULL,
     name TEXT NOT NULL,
     unit TEXT NOT NULL,
     unit_cost NUMERIC(10, 2) NOT NULL,
     pack_size NUMERIC(10, 3) NOT NULL,
     shelf_life_days INT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (restaurant_id, name)
+    UNIQUE (restaurant_id, external_id)
 );
 
 CREATE TABLE menu_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     restaurant_id UUID NOT NULL REFERENCES restaurants(id) ON DELETE CASCADE,
+    external_id TEXT NOT NULL,
     name TEXT NOT NULL,
     price NUMERIC(10, 2) NOT NULL,
     category TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (restaurant_id, name)
+    UNIQUE (restaurant_id, external_id)
 );
 
 CREATE TABLE recipes (

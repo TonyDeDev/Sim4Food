@@ -1,0 +1,6 @@
+start_date,end_date,type,name,items,discount_pct,expected_lift
+2026-07-01,2026-07-01,holiday,Canada Day,,,
+2026-08-14,2026-08-16,deal,Wrap Weekend,chicken_wrap,0.2,
+2026-09-07,2026-09-07,holiday,Labour Day,,,
+2026-10-09,2026-10-11,deal,Thanksgiving Pasta Special,penne_alfredo,0.2,
+2026-10-12,2026-10-12,holiday,Thanksgiving,,,

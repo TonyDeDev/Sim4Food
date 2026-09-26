@@ -42,13 +42,13 @@ The swarm's advantage over plain forecasting: it handles **situations with no hi
 | Database | PostgreSQL via `pg` (`src/lib/db.ts`) on the frontend; via `asyncpg` (`backend/app/db.py`) on the backend |
 | Hosting | Frontend on Vercel (Hobby plan). Python backend on a separate host because of Hobby function time limits |
 | LLM (stretch) | Claude API |
-| Storage | PostgreSQL (see `db/schema.sql`, run via `docker-compose.yml`); uploads seed it, `inventory_current` tracks running stock between uploads |
+| Storage | PostgreSQL hosted on Neon (see `db/schema.sql`); uploads seed it, `inventory_current` tracks running stock between uploads. `docker-compose.yml` still exists for offline local Postgres but is no longer the default - local dev points at Neon too. |
 
 **Environment variables** (see `.env.example` and `backend/.env.example`; never commit real values):
 
-- `POSTGRES_URL`: Postgres connection string for the Next.js app.
+- `POSTGRES_URL`: Neon connection string (includes `sslmode=require`), used by both the Next.js app and the FastAPI backend.
 - `NEXT_PUBLIC_API_URL`: base URL of the FastAPI backend, also set in Vercel env vars.
-- Backend Postgres connection is set via discrete vars (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT`) in `backend/app/config.py`, matching `docker-compose.yml`.
+- Backend Postgres connection: `backend/app/config.py` uses `POSTGRES_URL` directly when set, else falls back to discrete vars (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_SSLMODE`) for the Docker fallback.
 - `CORS_ORIGINS`: backend only, comma separated frontend origins (default `http://localhost:3000`).
 
 **Existing routes:** `GET /api/health` and `GET /api/db-health` in the Next.js app (`src/app/api/`).
