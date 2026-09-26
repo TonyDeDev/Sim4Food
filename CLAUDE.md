@@ -40,7 +40,7 @@ The swarm's advantage over plain forecasting: it handles **situations with no hi
 | Charts | Recharts (or Chart.js) |
 | Animation | HTML Canvas with `requestAnimationFrame` |
 | LLM (stretch) | Claude API |
-| Storage | Files only (CSV/JSON); no database |
+| Storage | PostgreSQL (see `db/schema.sql`); uploads seed it, `inventory_current` tracks running stock between uploads |
 
 ## Repo structure
 
