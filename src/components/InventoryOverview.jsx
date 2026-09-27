@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react'
-import { fetchInventory } from '../utils/api.js'
+import { fetchInventory, fetchLatestForecast } from '../utils/api.js'
+import { formatDate, formatTime } from '../utils/format.js'
 
 export default function InventoryOverview({ restaurantId }) {
   const [state, setState] = useState({ status: 'loading' })
+  // undefined = still loading, null = never run - kept separate from the
+  // main inventory fetch so a failure here never blocks the stock listing.
+  const [forecastRunAt, setForecastRunAt] = useState(undefined)
 
   useEffect(() => {
     let cancelled = false
@@ -10,6 +14,15 @@ export default function InventoryOverview({ restaurantId }) {
     fetchInventory(restaurantId)
       .then((data) => { if (!cancelled) setState({ status: 'ok', data }) })
       .catch((err) => { if (!cancelled) setState({ status: 'error', message: err.message }) })
+    return () => { cancelled = true }
+  }, [restaurantId])
+
+  useEffect(() => {
+    let cancelled = false
+    setForecastRunAt(undefined)
+    fetchLatestForecast(restaurantId)
+      .then((data) => { if (!cancelled) setForecastRunAt(data.run_at) })
+      .catch(() => { if (!cancelled) setForecastRunAt(null) })
     return () => { cancelled = true }
   }, [restaurantId])
 
@@ -35,9 +48,13 @@ export default function InventoryOverview({ restaurantId }) {
           <p className="stat-sub">of {summary.total}</p>
         </div>
         <div className="stat-card">
-          <p className="stat-label">Missing a count</p>
-          <p className="stat-value">{summary.missing_count}</p>
-          <p className="stat-sub">upload an inventory count</p>
+          <p className="stat-label">Last forecast</p>
+          <p className="stat-value">
+            {forecastRunAt === undefined ? '…' : forecastRunAt ? formatDate(forecastRunAt) : 'Not run yet'}
+          </p>
+          <p className="stat-sub">
+            {forecastRunAt ? formatTime(forecastRunAt) : 'run it from the Forecast tab'}
+          </p>
         </div>
         <div className="stat-card">
           <p className="stat-label">Stockout forecast</p>

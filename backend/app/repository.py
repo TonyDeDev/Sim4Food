@@ -205,6 +205,26 @@ _HANDLERS = {
 }
 
 
+async def get_upload_status(pool: asyncpg.Pool, restaurant_id: str) -> dict[str, str]:
+    """Latest successfully processed file name per file_type.
+
+    The record-upload cards in the UI show this instead of client-only state,
+    so a page reload (or a fresh login) still shows what was actually
+    uploaded rather than resetting to "no file uploaded" every time.
+    """
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            """
+            SELECT DISTINCT ON (file_type) file_type, file_name
+            FROM upload_batches
+            WHERE restaurant_id = $1 AND status = 'processed'
+            ORDER BY file_type, uploaded_at DESC
+            """,
+            restaurant_id,
+        )
+    return {r["file_type"]: r["file_name"] for r in rows}
+
+
 async def persist_upload(
     pool: asyncpg.Pool, restaurant_id: str, file_type: str, file_name: str, rows: list[dict]
 ) -> dict:

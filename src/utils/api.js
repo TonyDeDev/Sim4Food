@@ -24,6 +24,34 @@ export async function fetchInventory(restaurantId) {
   return response.json()
 }
 
+// {file_type: file_name} for whatever has actually been persisted - the
+// source of truth for "what's already uploaded", since a client-only
+// files map resets to empty on every fresh login/session restore.
+export async function fetchUploadStatus(restaurantId) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId })
+  const response = await fetch(`${API_URL}/api/uploads?${params}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(`Could not load upload status (${response.status})`)
+  return response.json()
+}
+
+// The forecast only trains when explicitly triggered (the Simulate button),
+// not on every page view - GET reads whatever was last stored (cheap, no
+// training), POST actually runs the model and stores the new result.
+// Both return {run_at, forecast}; run_at/forecast are null if never run.
+export async function fetchLatestForecast(restaurantId) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId })
+  const response = await fetch(`${API_URL}/api/forecast?${params}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(`Could not load the forecast (${response.status})`)
+  return response.json()
+}
+
+export async function runForecast(restaurantId) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId })
+  const response = await fetch(`${API_URL}/api/forecast?${params}`, { method: 'POST', credentials: 'include' })
+  if (!response.ok) throw new Error(`Could not run the forecast (${response.status})`)
+  return response.json()
+}
+
 export async function uploadRecordFile(restaurantId, fileType, file) {
   const body = new FormData()
   body.append('file', file)

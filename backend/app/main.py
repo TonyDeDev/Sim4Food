@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import db, repository
 from app.auth import get_current_user_id, verify_restaurant_owner
 from app.config import settings
-from sim import backtest, generator, ingest, inventory, waste
+from sim import backtest, forecast_store, generator, ingest, inventory, waste
 from sim.dataset import load_frames
 from sim.forecast_payload import build_forecast_payload
 
@@ -54,6 +54,12 @@ async def post_upload(
     return {**validation, **persisted}
 
 
+@app.get("/api/uploads")
+async def get_uploads(restaurant_id: str, user_id: str = Depends(get_current_user_id)):
+    await verify_restaurant_owner(restaurant_id, user_id)
+    return await repository.get_upload_status(db.get_pool(), restaurant_id)
+
+
 @app.get("/api/waste")
 async def get_waste(restaurant_id: str, user_id: str = Depends(get_current_user_id)):
     await verify_restaurant_owner(restaurant_id, user_id)
@@ -80,8 +86,19 @@ async def get_backtest(restaurant_id: str, user_id: str = Depends(get_current_us
 
 @app.get("/api/forecast")
 async def get_forecast(restaurant_id: str, user_id: str = Depends(get_current_user_id)):
-    """Next week's ingredient usage forecast with P10/P50/P90 bands, history, backtest and data status."""
+    """Latest stored forecast run, if any - a cheap read, no training."""
+    await verify_restaurant_owner(restaurant_id, user_id)
+    latest = await forecast_store.get_latest_run(db.get_pool(), restaurant_id)
+    return latest or {"run_at": None, "forecast": None}
+
+
+@app.post("/api/forecast")
+async def post_forecast(restaurant_id: str, user_id: str = Depends(get_current_user_id)):
+    """Runs the forecast now (next week's ingredient usage, P10/P50/P90 bands,
+    history, backtest and data status) and stores it as the latest run."""
     await verify_restaurant_owner(restaurant_id, user_id)
     frames = await load_frames(restaurant_id)
     # Training is CPU bound, keep it off the event loop.
-    return await asyncio.to_thread(build_forecast_payload, frames)
+    payload = await asyncio.to_thread(build_forecast_payload, frames)
+    run_at = await forecast_store.save_run(db.get_pool(), restaurant_id, payload)
+    return {"run_at": run_at, "forecast": payload}

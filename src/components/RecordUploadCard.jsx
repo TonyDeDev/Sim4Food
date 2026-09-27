@@ -29,7 +29,7 @@ export default function RecordUploadCard({ restaurantId, fieldKey, label, curren
   return (
     <article className="business-record-card">
       <div className="record-icon" aria-hidden="true"><DocumentIcon /></div>
-      <div>
+      <div className="record-card-body">
         <h2>{label}</h2>
         <div className="upload-box">
           <span className={`file-name${currentFile ? ' chosen' : ''}`}>

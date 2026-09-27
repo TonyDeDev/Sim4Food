@@ -552,38 +552,43 @@ form.stack {
 
 .business-record-grid {
   display: grid;
-  grid-template-columns: 1fr;
-  gap: 20px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
   align-items: stretch;
 }
 .business-record-card {
   min-width: 0;
-  min-height: 148px;
+  min-height: 104px;
   display: flex;
   align-items: flex-start;
-  gap: 16px;
-  padding: 22px;
+  gap: 10px;
+  padding: 14px;
   border: 1px solid var(--hairline);
-  border-radius: 14px;
+  border-radius: 12px;
   background: var(--pastel-green);
+  overflow: hidden;
 }
 .record-icon {
-  width: 42px;
-  height: 42px;
+  width: 30px;
+  height: 30px;
   flex: 0 0 auto;
   display: grid;
   place-items: center;
   border: 1px solid rgba(36, 92, 69, .2);
-  border-radius: 12px;
+  border-radius: 9px;
   background: rgba(255, 248, 234, .72);
   color: var(--deep-green);
 }
-.record-icon svg { width: 22px; height: 22px; }
-.business-record-card h2 { margin: 1px 0 8px; color: var(--deep-green); font-size: 18px; font-weight: 500; }
-.business-record-card p { margin: 0; color: var(--ink-soft); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
-@media (max-width: 700px) {
-  .business-record-grid { grid-template-columns: 1fr; gap: 12px; }
-  .business-record-card { min-height: 112px; padding: 18px; }
+.record-icon svg { width: 15px; height: 15px; }
+.record-card-body {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.record-card-body h2 { margin: 0 0 5px; color: var(--deep-green); font-size: 14px; font-weight: 500; }
+.record-card-body p { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  .business-record-grid { gap: 10px; }
+  .business-record-card { min-height: 96px; padding: 10px; gap: 8px; }
 }
 
 .record-tabs {
@@ -592,6 +597,34 @@ form.stack {
   margin-bottom: 22px;
   border-bottom: 1px solid var(--hairline);
 }
+.forecast-run-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.forecast-run-bar .hint { margin: 0; }
+
+.whatif-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 420px;
+  margin: 16px 0 20px;
+}
+.whatif-slider label {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+.whatif-slider input[type="range"] {
+  width: 100%;
+  accent-color: var(--deep-green);
+}
+.whatif-slider .hint { margin: 8px 0 0; }
 .record-tab {
   padding: 10px 4px;
   margin-bottom: -1px;
@@ -612,6 +645,7 @@ form.stack {
   gap: 16px;
   margin-bottom: 20px;
 }
+.stat-grid.stat-grid-3 { grid-template-columns: repeat(3, 1fr); }
 .stat-card {
   min-width: 0;
   padding: 18px;
@@ -623,10 +657,10 @@ form.stack {
 .stat-value { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 600; color: var(--deep-green); }
 .stat-sub { margin: 6px 0 0; font-size: 12px; color: var(--ink-faint); }
 @media (max-width: 700px) {
-  .stat-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+  .stat-grid, .stat-grid.stat-grid-3 { grid-template-columns: 1fr 1fr; gap: 12px; }
 }
 @media (max-width: 480px) {
-  .stat-grid { grid-template-columns: 1fr; }
+  .stat-grid, .stat-grid.stat-grid-3 { grid-template-columns: 1fr; }
 }
 
 .alert-card {
@@ -679,7 +713,11 @@ form.stack {
   border-radius: 14px;
   padding: 4px 18px;
   background: var(--cream);
+  margin-bottom: 20px;
 }
+.inventory-table-wrap:last-child { margin-bottom: 0; }
+
+.sparkline { display: block; }
 
 .biz-card {
   background: var(--pastel-green);
@@ -841,29 +879,26 @@ form.stack {
 .location-suggestions .location-message { padding: 10px 11px; color: var(--ink-soft); font-size: 12px; line-height: 1.4; }
 .location-suggestions-wrap > small { display: block; padding: 7px 11px; border-top: 1px solid var(--hairline); color: var(--ink-faint); font-size: 10px; }
 
-.upload-field label {
-  display: block;
-  font-size: 14px;
-  font-weight: 500;
-  margin-bottom: 4px;
-}
-.upload-field .hint {
+.hint {
   font-size: 13px;
   color: var(--ink-soft);
   margin: 0 0 8px;
 }
 .upload-box {
+  min-width: 0;
   border: 1px dashed var(--hairline);
-  border-radius: 8px;
-  padding: 14px;
+  border-radius: 7px;
+  padding: 8px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   background: var(--cream-deep);
 }
 .upload-box .file-name {
-  font-size: 13px;
+  min-width: 0;
+  flex: 1 1 auto;
+  font-size: 12px;
   color: var(--ink-soft);
   overflow: hidden;
   text-overflow: ellipsis;
@@ -874,9 +909,9 @@ form.stack {
   font-weight: 500;
 }
 .btn-choose {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  padding: 7px 14px;
+  padding: 5px 10px;
   border-radius: 6px;
   border: 1px solid var(--deep-green);
   background: var(--cream);

@@ -1,14 +1,18 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Sidebar from '../components/Sidebar.jsx'
 import AddBusinessModal from '../components/AddBusinessModal.jsx'
 import BusinessDetailsPanel from '../components/BusinessDetailsPanel.jsx'
 import RecordUploadCard from '../components/RecordUploadCard.jsx'
 import InventoryOverview from '../components/InventoryOverview.jsx'
-import { createRestaurant, RECORD_FIELDS } from '../utils/api.js'
+import ForecastOverview from '../components/ForecastOverview.jsx'
+import WhatIfSimulation from '../components/WhatIfSimulation.jsx'
+import { createRestaurant, fetchUploadStatus, RECORD_FIELDS } from '../utils/api.js'
 
 const TABS = [
+  { key: 'home', label: 'Home' },
   { key: 'records', label: 'Records' },
-  { key: 'inventory', label: 'Inventory' },
+  { key: 'forecast', label: 'Forecast' },
+  { key: 'whatif', label: 'What If' },
 ]
 
 export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBusiness, onUploadRecord, onSignOut }) {
@@ -16,8 +20,26 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
   const [modalOpen, setModalOpen] = useState(false)
   const [activeId, setActiveId] = useState(businesses[0]?.id ?? null)
   const [detailsBusiness, setDetailsBusiness] = useState(null)
-  const [activeTab, setActiveTab] = useState('records')
+  const [activeTab, setActiveTab] = useState('home')
   const selectedBusiness = businesses.find((business) => business.id === activeId) || businesses[0] || null
+  const selectedBusinessId = selectedBusiness?.id
+
+  // The upload cards' "which file is this" display is client-only state
+  // (files: {}), reset to empty on every fresh login. Re-hydrate it here
+  // from upload_batches (the real source of truth) whenever the selected
+  // business changes, so a page reload or a fresh login shows what's
+  // actually been uploaded instead of "No file uploaded" for everything.
+  useEffect(() => {
+    if (!selectedBusinessId) return
+    let cancelled = false
+    fetchUploadStatus(selectedBusinessId)
+      .then((statusMap) => {
+        if (cancelled) return
+        onUpdateBusiness(selectedBusinessId, { files: statusMap })
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [selectedBusinessId])
 
   function handleSelectBusiness(id) {
     setActiveId(id)
@@ -65,7 +87,7 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
         <div className="main-head">
           <div>
             <h1>{selectedBusiness?.name || 'Your businesses'}</h1>
-            <p>{selectedBusiness ? 'Upload records and see how long your stock will last.' : 'Add a business to start estimating its food waste.'}</p>
+            <p>{selectedBusiness ? "Here's what's in stock, plus your records and forecast." : 'Add a business to start estimating its food waste.'}</p>
           </div>
         </div>
 
@@ -97,6 +119,8 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
               ))}
             </nav>
 
+            {activeTab === 'home' && <InventoryOverview restaurantId={selectedBusiness.id} />}
+
             {activeTab === 'records' && (
               <section className="business-record-grid" aria-label={`${selectedBusiness.name} records`}>
                 {RECORD_FIELDS.map(({ key, label }) => (
@@ -112,7 +136,9 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
               </section>
             )}
 
-            {activeTab === 'inventory' && <InventoryOverview restaurantId={selectedBusiness.id} />}
+            {activeTab === 'forecast' && <ForecastOverview restaurantId={selectedBusiness.id} />}
+
+            {activeTab === 'whatif' && <WhatIfSimulation restaurantId={selectedBusiness.id} />}
           </>
         )}
       </main>
