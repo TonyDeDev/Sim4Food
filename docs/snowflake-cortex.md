@@ -21,6 +21,8 @@ Forecast tab: Overview -> POST /api/insights/summary?restaurant_id=&style=summar
   -> streamed text deltas | overview text (cached per run and style)
 ```
 
+The browser reaches these through the same-origin proxy at `/py/*` (`next.config.ts` rewrites `/py/:path*` to the FastAPI backend) - the paths above are FastAPI's own route paths once the request arrives there.
+
 | File | Role |
 |---|---|
 | `backend/app/cortex.py` | REST client: PAT auth, OpenAI-style body, SSE streaming, readable errors. |

@@ -1,7 +1,8 @@
-// Strip any trailing slash so a `.env` value like "http://localhost:8000/"
-// doesn't produce a double-slash path (e.g. ":8000//api/inventory") that
-// FastAPI's router won't match.
-export const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
+// All backend calls go through the /py/* rewrite in next.config.ts, so this
+// is always same-origin - no cross-origin cookie concerns, no env var needed
+// in this file. The backend's own real URL lives server-side only, in the
+// BACKEND_URL env var that next.config.ts reads.
+export const API_URL = '/py'
 
 export const RECORD_FIELDS = [
   { key: 'ingredients', label: 'Ingredients' },
@@ -13,11 +14,10 @@ export const RECORD_FIELDS = [
   { key: 'events', label: 'Deals and holidays' },
 ]
 
-// FastAPI lives on a different origin (:8000 vs :3000), so the session
-// cookie set by the Next.js auth routes only reaches it with
-// credentials: 'include' - and only because both sides share the same
-// "localhost" host (cookies aren't port-scoped). FastAPI's CORS config
-// must allow_credentials for this to work (see backend/app/main.py).
+// FastAPI is reached through the /py/* same-origin proxy (see
+// next.config.ts), so the session cookie is sent automatically like any
+// other same-origin request. credentials: 'include' is kept below for
+// robustness but is no longer load-bearing for the cookie to arrive.
 export async function fetchInventory(restaurantId) {
   const params = new URLSearchParams({ restaurant_id: restaurantId })
   const response = await fetch(`${API_URL}/api/inventory?${params}`, { credentials: 'include' })

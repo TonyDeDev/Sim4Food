@@ -47,9 +47,9 @@ The swarm's advantage over plain forecasting: it handles **situations with no hi
 **Environment variables** (see `.env.example` and `backend/.env.example`; never commit real values):
 
 - `POSTGRES_URL`: Neon connection string (includes `sslmode=require`), used by both the Next.js app and the FastAPI backend.
-- `NEXT_PUBLIC_API_URL`: base URL of the FastAPI backend, also set in Vercel env vars.
+- `BACKEND_URL`: base URL of the FastAPI backend, read only by `next.config.ts`'s `rewrites()` (proxies `/py/*` to it server-to-server so the browser and backend are same-origin) - not exposed to the browser, also set in Vercel env vars.
 - Backend Postgres connection: `backend/app/config.py` uses `POSTGRES_URL` directly when set, else falls back to discrete vars (`POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_HOST`, `POSTGRES_PORT`, `POSTGRES_SSLMODE`) for the Docker fallback.
-- `CORS_ORIGINS`: backend only, comma separated frontend origins (default `http://localhost:3000`).
+- `CORS_ORIGINS`: backend only, comma separated frontend origins (default `http://localhost:3000`); no longer required for the deployed app now that the browser reaches the backend only through the `/py/*` proxy, kept for local-dev convenience.
 
 **Existing routes:** `GET /api/health` and `GET /api/db-health` in the Next.js app (`src/app/api/`).
 

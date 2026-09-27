@@ -24,6 +24,11 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="SwarmStock API", lifespan=lifespan)
 
+# No longer load-bearing for the deployed app once the browser reaches this
+# backend only through Next.js's /py/* proxy (server-to-server calls aren't
+# subject to browser CORS at all). Kept for local-dev convenience (hitting
+# this backend directly with a browser tool) and any future direct
+# cross-origin browser client.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origin_list,
