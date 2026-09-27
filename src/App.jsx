@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Login from './screens/Login.jsx'
 import Signup from './screens/Signup.jsx'
 import Dashboard from './screens/Dashboard.jsx'
@@ -60,9 +60,10 @@ export default function App() {
     setBusinesses((prev) => [...prev, business])
   }
 
-  function handleUpdateBusiness(id, updates) {
+  // Stable identity: Dashboard re-hydrates upload status in an effect that depends on it.
+  const handleUpdateBusiness = useCallback((id, updates) => {
     setBusinesses((prev) => prev.map((business) => business.id === id ? { ...business, ...updates } : business))
-  }
+  }, [])
 
   // Merges against the latest state rather than a captured snapshot: uploads
   // run concurrently and finish out of order, so a caller-built files map can

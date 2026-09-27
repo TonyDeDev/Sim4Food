@@ -7,7 +7,7 @@ export default function AuthLayout({ quote, cite, children }) {
         </a>
         <div className="side-quote">
           <blockquote>&ldquo;{quote}&rdquo;</blockquote>
-          <cite>— {cite}</cite>
+          <cite>- {cite}</cite>
         </div>
         <p className="side-foot">© 2026 Sim4Food</p>
       </aside>

@@ -109,7 +109,7 @@ export default function Login({ onLogin, goToSignup }) {
       </div>
 
       <p className="signup-note">
-        Don't have an account?{' '}
+        Don&apos;t have an account?{' '}
         <a href="#" onClick={(e) => { e.preventDefault(); goToSignup() }}>
           Sign up for free
         </a>

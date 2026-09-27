@@ -338,6 +338,48 @@ async def insert_inventory_counts(conn: asyncpg.Connection, restaurant_id: str, 
     return errors
 
 
+def _fraction(value) -> float | None:
+    """0.2 and 20 both mean 20%."""
+    if value is None or str(value).strip() == "":
+        return None
+    number = float(value)
+    return number / 100 if number > 1 else number
+
+
+async def insert_events(conn: asyncpg.Connection, restaurant_id: str, rows: list[dict]) -> list[str]:
+    """Replaces the restaurant's events with the file: it is the full list of past and planned events.
+
+    `items` holds menu item ids (the menu file's item_id) separated by commas;
+    they are stored as menu_items UUIDs. Nothing is written when any row fails.
+    """
+    menu_item_map = await _id_map(conn, "menu_items", restaurant_id)
+    errors: list[str] = []
+    records = []
+    for row in rows:
+        items = [i.strip() for i in str(row.get("items") or "").replace(";", ",").split(",") if i.strip()]
+        unknown = [i for i in items if i not in menu_item_map]
+        if unknown:
+            errors.append(f"{row['name']}: unknown item_id (upload menu first): {', '.join(unknown)}")
+            continue
+        records.append((
+            restaurant_id, str(row["type"]).strip().lower(), row["name"],
+            date.fromisoformat(str(row["start_date"]).strip()), date.fromisoformat(str(row["end_date"]).strip()),
+            [menu_item_map[i] for i in items], _fraction(row.get("discount_pct")), _fraction(row.get("expected_lift")),
+        ))
+    if errors:
+        return errors
+
+    await conn.execute("DELETE FROM events WHERE restaurant_id = $1", restaurant_id)
+    await conn.executemany(
+        """
+        INSERT INTO events (restaurant_id, type, name, start_date, end_date, items, discount_pct, expected_lift)
+        VALUES ($1, $2::event_type, $3, $4, $5, $6::uuid[], $7, $8)
+        """,
+        records,
+    )
+    return errors
+
+
 _HANDLERS = {
     "ingredients": upsert_ingredients,
     "menu": upsert_menu_items,
@@ -345,6 +387,7 @@ _HANDLERS = {
     "sales": insert_sales,
     "purchases": insert_purchases,
     "inventory_counts": insert_inventory_counts,
+    "events": insert_events,
 }
 
 

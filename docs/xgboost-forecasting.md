@@ -1,40 +1,140 @@
-# XGBoost ingredient usage forecasting
+# XGBoost ingredient usage forecasting and ordering
 
 ## Purpose and scope
 
-This document describes the V1 XGBoost forecasting layer for SwarmStock.
-It predicts next week's theoretical usage of each ingredient from POS sales and recipes stored in Neon.
-The prediction is the input to the purchase recommendation step, which is not part of this work.
+This document describes the XGBoost forecasting layer for SwarmStock and the order recommendation built on it.
+It forecasts the theoretical usage of each ingredient for the target week from POS sales and recipes stored in Neon, and turns that forecast into an order per delivery day.
+The V2 section right below is the current design.
+The V1 sections after it are kept for the reasoning and the history of the numbers.
+The audit that motivated V2 is in [xgboost-audit.md](xgboost-audit.md).
 
-Pipeline:
+Pipeline (V2):
 
 ```
-sales -> menu_items -> recipes -> ingredients
-  -> daily theoretical ingredient usage
-  -> weekly point-in-time features
-  -> XGBoost
-  -> next-week ingredient usage
-  -> (later) inventory + purchases + pack size -> purchase recommendation
+sales -> dish x day matrix (stockout days censored, event days kept out of the baseline)
+  -> rolling-origin backtest (retrain per week, champion check)
+  -> XGBoost ratio model, blended 50/50 with the same-weekday baseline
+  -> recursive forecast up to the target week, explicit deal and holiday lift
+  -> Monte Carlo usage samples from out-of-sample residuals (P10 / P50 / P90, any quantile)
+  -> newsvendor order per delivery day, pack rounding, projected stock
+  -> savings vs the owner's habit and a replay against what they actually bought
 ```
 
 The primary target is usage, not purchase quantity.
-Historical purchases are not necessarily what the restaurant needed, so they are used as features only.
+Historical purchases are not necessarily what the restaurant needed, so they are never a training target.
+
+## V2: what changed and why
+
+Each change was kept only if the rolling backtest on the demo data did not get worse.
+Numbers are from `python -m sim.forecast_backtest --csv-dir data/demo` (6 origin weeks, 72 ingredient-weeks), scored on uncensored dish-days only.
+
+| Change | Where | Why |
+|---|---|---|
+| Stockout days are censored | `dish_features.py` | A dish that normally sells and sold 0 on an open day ran out. That day is never a training target, and its baseline falls back to the dish's recent level x the restaurant's weekday index, so the forecast estimates demand instead of repeating the zero. In the demo, fish and chips sells out every Sunday. |
+| Days before a dish's first sale are unknown | `dish_features.py` | A new dish no longer drags its own baseline down with pre-launch zeros. |
+| Event days kept out of the normal baseline | `dish_features.py` | A deal weekend no longer inflates the same weekday for the next 4 weeks. |
+| Explicit deal and holiday lift | `events_adjust.py` | With a handful of past event days, trees cannot learn a lift. The lift is the mean actual / baseline on past uncensored event days, shrunk toward 1 (`n / (n + 3)`) and scaled by discount. The owner's `expected_lift` wins when given. |
+| Event and season features gated on data volume | `train_dish_xgb.select_features` | Event features need 30 event rows, `week_of_year` and `month` need 52 weeks. Before that they only let the model memorise. Deal features carry monotone constraints. |
+| Refit after early stopping | `train_dish_xgb.fit` | Early stopping picks the tree count on the 2 newest weeks, then the model is refit on all weeks so the newest data shapes it. |
+| 50/50 blend with the weekday baseline | `train_dish_xgb.predict_qty` | On 12 weeks the model alone (WAPE 0.067) lost to the baseline (0.061), and the equal-weight blend beat both (0.058). The weight is a fixed prior, not tuned on these weeks. |
+| Champion check | `forecast_payload.py` | If the blend's backtest error is worse than the baseline's, the baseline is shipped and the UI says why. |
+| Target week anchored to today | `forecast_payload._target`, `train_dish_xgb.forecast_weeks` | The forecast used to target the week after the data, which could already be over. It now targets the week after today and rolls forward recursively (up to 6 weeks). Older data is flagged as stale. |
+| Monte Carlo bands | `uncertainty.py` | See below. |
+| Backtest scored on uncensored days, capped to 12 origins | `forecast_backtest.py` | A stockout day's sales are not demand. The cap keeps a year of history under the 10 s rule. |
+| Order recommendation | `recommend.py` | See below. |
+
+### Accuracy (demo data, out of sample)
+
+| Method | WAPE |
+|---|---|
+| Shipped: XGBoost 50/50 with weekday baseline, event lift | 0.058 |
+| Same-weekday baseline (censor aware, event lift) | 0.061 |
+| Raw same-weekday mean of the last 4 weeks | 0.061 |
+| Same as last week | 0.073 |
+| V1 dish model, re-scored on the same uncensored days | 0.060 |
+
+### Bands: Monte Carlo from out-of-sample residuals
+
+- For every backtest week and dish, `log(actual / predicted)` is split into a week effect (weighted mean over dishes, shared by every dish that week) and dish noise.
+- Each of 1000 draws (fixed seed) samples a week effect and a dish noise per dish, multiplies the dish forecasts, and converts dishes to ingredients with the recipes.
+  Ingredients that share dishes (beef patty and bun) move together, as they really do.
+- A spread scale widens the draws around their median until P10 to P90 held 80% of past actuals.
+  When scoring a week, the scale is fit only on earlier weeks, so the reported coverage is out of sample.
+- The spread grows with `sqrt(weeks ahead)`, and dishes carrying an event lift get extra spread.
+
+| Bands (same 48 ingredient-weeks) | Inside P10 to P90 | Relative interval score | Relative pinball |
+|---|---|---|---|
+| V1 pooled ratio | 0.646 | 0.563 | 0.035 |
+| V2 Monte Carlo | 0.854 | 0.532 | 0.037 |
+
+The interval score (lower is better) rewards bands that are both narrow and right.
+V2 reaches the 80% target with a better interval score, while the median (pinball) is slightly worse.
+With 4 to 6 scored weeks these numbers are noisy.
+On the same data loaded from Neon, where dish ids are UUIDs and the random draws land differently, coverage was 0.77.
+
+### Order recommendation
+
+- Delivery days are read from the purchase history (weekdays with at least 15% of purchase rows, Monday and Thursday in the demo).
+- Per ingredient, `Co` is the unit cost if perishable (shelf life 7 days or less), else a 10% carry cost.
+  `Cu` is half the dish margin lost per unit short, weighted by the dishes that use the ingredient.
+  The service level `q* = Cu / (Cu + Co)` is clipped to 0.5 to 0.95.
+- The first delivery is firm: the `q*` quantile of that cycle's usage minus projected stock, rounded up to whole packs.
+- Later deliveries adapt: the forecast for the rest of the week is scaled by half of the surprise seen so far, then topped up to its `q*` quantile.
+- Projected stock at the target Monday is the latest count + purchases since - actual usage since - forecast usage for the gap days.
+- Outcomes are simulated on the Monte Carlo samples: expected leftover, waste cost (perishables) and run-out risk.
+- The same samples score the owner's habit (last week's usage x 1.25 minus stock, rounded to packs).
+- `order_backtest` replays the backtest weeks delivery by delivery: our adaptive orders against what the owner actually bought, on estimated demand (sales, with stockout days filled by the forecast).
+
+On the demo data (4 replayed weeks) our orders cut waste by 10% (offline CSVs) to 16% (Neon) against what the owner actually bought, with a little more lost margin, for net savings of $10 to $190 over the 4 weeks.
+The demo owner already tops up mid-week, which is a strong baseline.
+Committing the whole week on Monday lost to them, which is why the adaptive top-up exists.
+
+### Payload (V2)
+
+```
+data:        weeks_of_history, first_week, last_week, target_week (= forecast_week), based_on_sales_through,
+             gap_weeks, stale, method (xgboost_blend | weekday_baseline | baseline), method_reason, status, message
+accuracy:    backtest_weeks, methods{xgboost, dish_baseline, naive_last_week, mean_4w}{mae, wape},
+             band_coverage{inside_p10_p90, below_p10, above_p90, n, relative_interval_score, relative_pinball, target_inside},
+             band_comparison{monte_carlo, pooled_ratio}, spread_scale, stockout_days_excluded
+events:      [{name, type, start_date, end_date, discount_pct, lift_pct, lift_source}] overlapping the target week
+savings:     delivery_days, weekly_expected_vs_habit, expected_waste_cost, habit_waste_cost,
+             order_backtest{weeks, ours, actual, total_savings, weekly_savings, waste_reduction_pct, by_week[]}
+ingredients: [{ ingredient_id, name, unit,
+                history:  [{week, usage}],
+                forecast: {week, point, p10, p50, p90, event_adjustment_pct},
+                recommendation: {order_qty, deliveries[{day, qty, firm}], packs, pack_size, on_hand, service_level,
+                                 perishable, expected_leftover, expected_waste_cost, stockout_risk,
+                                 habit_order_qty, habit_stockout_risk, expected_savings},
+                backtest: [{week, actual, predicted, p10, p90}] }]
+```
+
+`POST /api/forecast?restaurant_id=<uuid>&target_week=<YYYY-MM-DD>` (the target week is optional) runs it in about 3.5 s on the demo data from Neon.
+The Snowflake Cortex summary and chat read this stored payload, see [snowflake-cortex.md](snowflake-cortex.md).
+
+### Known limits
+
+- 12 weeks is thin: the blend's edge over the baseline (0.058 vs 0.061) is within week-to-week noise.
+- Residuals are one-week-ahead errors, so the `sqrt(weeks ahead)` widening for gap weeks is an assumption, not a measurement.
+- A partial-day stockout (sold some, then ran out) is not detected, only zero-sale days are censored.
+- The weekly simulation treats all perishable leftovers at the end of the week as waste, for both sides of every comparison.
+- The ingredient-level model (`features.py`, `train_xgb.py`) is experimental and not used by the API.
 
 ## Code map
 
 | File | Role |
 |---|---|
-| `backend/sim/dataset.py` | Async loader: pulls one restaurant's tables from Postgres into pandas frames with string ids. |
-| `backend/sim/features.py` | Pure pandas point-in-time feature matrix (`build_feature_matrix`). |
-| `backend/sim/train_xgb.py` | CLI: build matrix, chronological split, fit, report metrics against baselines, save model. |
-| `backend/sim/dish_features.py` | Daily dish-level point-in-time matrix with a ratio target (`build_dish_matrix`). |
-| `backend/sim/train_dish_xgb.py` | CLI: train the dish-level model, convert to ingredient usage, evaluate, print next week forecast. |
-| `backend/tests/test_features.py` | Unit tests for the ingredient-level matrix, including leakage tests. |
-| `backend/sim/forecast_backtest.py` | CLI: rolling-origin backtest, residual P10/P50/P90 bands, coverage check, next week forecast with bands. |
-| `backend/sim/forecast_payload.py` | Builds the JSON payload for the frontend: history, forecast with bands, backtest, data status. |
-| `backend/app/main.py` | Adds `GET /api/forecast?restaurant_id=<uuid>`, protected by the same session and ownership check as the other routes. |
-| `backend/tests/test_dish_features.py` | Unit tests for the dish-level matrix, including leakage tests. |
-| `backend/tests/test_forecast_backtest.py` | Unit tests for bands, coverage and leakage in the rolling backtest. |
+| `backend/sim/dataset.py` | Async loader: pulls one restaurant's tables (including menu prices) from Postgres into pandas frames with string ids. |
+| `backend/sim/dish_features.py` | Daily dish matrix: ratio target, censored stockout days, clean baselines, event flags (`build_dish_matrix`). |
+| `backend/sim/train_dish_xgb.py` | Feature selection, fit with refit, blended prediction, recursive multi-week forecast, and a CLI for inspection. |
+| `backend/sim/events_adjust.py` | Deal and holiday lift, estimated from history or taken from the owner. |
+| `backend/sim/forecast_backtest.py` | Rolling-origin backtest at dish-day level, ingredient-week scoring, band comparison, and a CLI. |
+| `backend/sim/uncertainty.py` | Monte Carlo usage samples, out-of-sample band scoring and calibration. |
+| `backend/sim/recommend.py` | Newsvendor orders per delivery day, projected stock, habit comparison, order backtest. |
+| `backend/sim/forecast_payload.py` | Builds the JSON payload for the frontend. |
+| `backend/app/main.py` | `GET` and `POST /api/forecast`, protected by the session and ownership check. |
+| `backend/sim/features.py`, `backend/sim/train_xgb.py` | Experimental ingredient-week model, not used by the API. |
+| `backend/tests/test_dish_features.py`, `test_forecast_backtest.py`, `test_forecast_quality.py`, `test_forecast_payload.py` | Leakage, censoring, refit, lift, bands, recommendations and payload tests. |
 
 ## Training grain and target
 
@@ -159,7 +259,7 @@ On 12 weeks of data the baselines beat XGBoost.
 That is expected with about 7 training weeks, and it means the model should not be shipped to users yet.
 The value of this pass is a leak-free pipeline that improves as history accumulates.
 
-## Dish-level daily model (V1b, preferred)
+## Dish-level daily model (V1b)
 
 The ingredient-level model above has only about 132 rows on 12 weeks of data.
 The dish-level model predicts what actually drives usage, the number of each dish sold per day, and converts to ingredients afterwards.
@@ -239,7 +339,7 @@ First result on the demo CSVs (ingredient-week level, test weeks 2026-09-07 and 
 This single split looked good, but it turned out to be a lucky pair of weeks.
 The rolling backtest below is the number to trust.
 
-## Rolling backtest and P10 to P90 bands
+## Rolling backtest and P10 to P90 bands (V1, superseded by the V2 bands above)
 
 `sim/forecast_backtest.py` retrains the dish-level model for every origin week T using only earlier weeks (early stopping on the 2 weeks just before T), forecasts week T, and converts to ingredient usage.
 With 12 weeks of data this gives 6 out-of-sample origins and 72 ingredient-weeks.
@@ -291,7 +391,7 @@ Ideas to improve coverage, in order:
 - Calibrate bands from dish-day errors, where there are far more independent points, and propagate them to ingredients.
 - Widen the bands for weeks with events or holidays, where errors are larger.
 
-## Frontend payload and data status
+## Frontend payload and data status (V1, see the V2 payload above)
 
 `GET /api/forecast?restaurant_id=<restaurants.id>` returns everything a forecast page needs in one response.
 Like the other routes it needs a signed in session cookie, and the restaurant must belong to the signed in user (401, 403 or 404 otherwise).

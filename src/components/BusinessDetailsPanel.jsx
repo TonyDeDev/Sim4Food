@@ -1,13 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 
 export default function BusinessDetailsPanel({ business, onClose, onSave }) {
   const [name, setName] = useState(business?.name || '')
   const [type, setType] = useState(business?.type || '')
 
-  useEffect(() => {
+  // Reset the fields synchronously during render when a different business
+  // is opened, rather than inside an effect (see "resetting state when a
+  // prop changes": https://react.dev/learn/you-might-not-need-an-effect).
+  const [syncedBusiness, setSyncedBusiness] = useState(business)
+  if (business !== syncedBusiness) {
+    setSyncedBusiness(business)
     setName(business?.name || '')
     setType(business?.type || '')
-  }, [business])
+  }
 
   if (!business) return null
 
