@@ -82,9 +82,11 @@ export async function fetchForecastSummary(restaurantId, { style = 'summary', si
   return response.json()
 }
 
-// Streams the assistant's answer: onDelta receives each text chunk as it arrives.
-export async function streamForecastChat(restaurantId, messages, onDelta, signal) {
-  const params = new URLSearchParams({ restaurant_id: restaurantId })
+// Streams the assistant's answer about one dashboard tab ('home', 'records',
+// 'forecast', 'whatif'): onDelta receives each text chunk as it arrives. Only the
+// tab name is sent; the server loads that tab's data itself.
+export async function streamChat(restaurantId, page, messages, onDelta, signal) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId, page })
   const response = await fetch(`${API_URL}/api/insights/chat?${params}`, {
     method: 'POST',
     credentials: 'include',

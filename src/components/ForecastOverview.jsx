@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react'
 import AiOverview from './AiOverview.jsx'
 import { fetchInsightsStatus, fetchLatestForecast, runForecast } from '../utils/api.js'
 import { formatDateTime, formatDay, formatMoney, formatPct, formatWeekRange } from '../utils/format.js'
-import ForecastChat from './ForecastChat.jsx'
 import OrderBacktest from './OrderBacktest.jsx'
 import RecommendationsTable from './RecommendationsTable.jsx'
 import StatCard from './StatCard.jsx'
@@ -152,10 +151,7 @@ function ForecastResults({ forecast, restaurantId, runAt, assistant }) {
       )}
 
       {assistant?.configured ? (
-        <div className="ai-grid">
-          <AiOverview restaurantId={restaurantId} runAt={runAt} model={assistant.model} />
-          <ForecastChat restaurantId={restaurantId} runAt={runAt} />
-        </div>
+        <AiOverview restaurantId={restaurantId} runAt={runAt} model={assistant.model} />
       ) : assistant && (
         <p className="hint ai-off">The AI assistant (Snowflake Cortex) is not set up on this server yet.</p>
       )}

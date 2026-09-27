@@ -6,6 +6,7 @@ import RecordUploadCard from '../components/RecordUploadCard.jsx'
 import InventoryOverview from '../components/InventoryOverview.jsx'
 import ForecastOverview from '../components/ForecastOverview.jsx'
 import WhatIfSimulation from '../components/WhatIfSimulation.jsx'
+import ChatWidget from '../components/ChatWidget.jsx'
 import { createRestaurant, fetchUploadStatus, RECORD_FIELDS } from '../utils/api.js'
 
 const TABS = [
@@ -142,6 +143,10 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
           </>
         )}
       </main>
+
+      {selectedBusiness && (
+        <ChatWidget restaurantId={selectedBusiness.id} page={activeTab} businessName={selectedBusiness.name} />
+      )}
 
       <AddBusinessModal open={modalOpen} onClose={() => setModalOpen(false)} onSubmit={handleSubmit} />
       {detailsBusiness && <BusinessDetailsPanel business={detailsBusiness} onClose={() => setDetailsBusiness(null)} onSave={onUpdateBusiness} />}

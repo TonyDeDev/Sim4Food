@@ -72,7 +72,7 @@ Shown when a deal or holiday overlaps the target week (`events`).
 ## Overview and chat (Snowflake Cortex)
 
 - **Overview** explains the current run in words: **Summary** is 3 to 5 short bullets, **Detailed** is two paragraphs.
-- **Ask about this order** answers questions about the same run.
+- **Ask** (the button in the bottom-right corner, on every tab) answers questions about the data on the tab you are on; on this tab, the current run.
 - Both are written by Snowflake Cortex from the numbers on this tab only, and are told not to invent any.
   They never change the forecast or the order.
 - If a statement looks off, the tables below are the source of truth.
