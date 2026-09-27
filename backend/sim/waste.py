@@ -101,24 +101,20 @@ def build_waste_report(
 async def compute_waste(restaurant_id: str) -> dict:
     pool = get_pool()
     async with pool.acquire() as conn:
-        restaurant_uuid = await conn.fetchval("SELECT id FROM restaurants WHERE name = $1", restaurant_id)
-        if restaurant_uuid is None:
-            return {"by_ingredient": []}
-
         # Every fetch is explicitly ordered. Weekly totals are accumulated as
         # floats, and float addition is not associative, so an unordered fetch
         # let physical row order shift a total by a cent between runs.
         ingredients = await conn.fetch(
             "SELECT id, external_id, name, unit_cost FROM ingredients WHERE restaurant_id = $1 ORDER BY external_id",
-            restaurant_uuid,
+            restaurant_id,
         )
         purchases = await conn.fetch(
             "SELECT ingredient_id, date, qty FROM purchases WHERE restaurant_id = $1 ORDER BY date, ingredient_id",
-            restaurant_uuid,
+            restaurant_id,
         )
         counts = await conn.fetch(
             "SELECT ingredient_id, date, qty_on_hand FROM inventory_counts WHERE restaurant_id = $1 ORDER BY date, ingredient_id",
-            restaurant_uuid,
+            restaurant_id,
         )
         consumption = await conn.fetch(
             """
@@ -128,7 +124,7 @@ async def compute_waste(restaurant_id: str) -> dict:
             WHERE s.restaurant_id = $1
             ORDER BY s.date, r.ingredient_id
             """,
-            restaurant_uuid,
+            restaurant_id,
         )
 
     return build_waste_report(

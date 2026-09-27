@@ -649,27 +649,10 @@ form.stack {
 .alert-subtitle { margin: 0; font-size: 14px; color: var(--ink-soft); }
 .alert-footer { margin: 0; font-size: 12px; color: var(--ink-faint); }
 
-.priority-badge {
-  flex-shrink: 0;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
+.pending-note {
+  font-style: italic;
+  color: var(--ink-faint);
 }
-.priority-badge.critical { background: color-mix(in srgb, var(--error) 15%, var(--cream)); color: var(--error); }
-.priority-badge.watch { background: color-mix(in srgb, var(--amber) 16%, var(--cream)); color: var(--amber); }
-.priority-badge.ok { background: var(--green-wash); color: var(--deep-green); }
-.priority-badge.unknown { background: var(--cream-deep); color: var(--ink-faint); }
-
-.stock-bar {
-  height: 8px;
-  border-radius: 999px;
-  background: var(--hairline);
-  overflow: hidden;
-}
-.stock-bar-fill { height: 100%; border-radius: 999px; background: var(--deep-green); }
-.stock-bar-fill.critical { background: var(--error); }
-.stock-bar-fill.watch { background: var(--amber); }
 
 .inventory-table { width: 100%; border-collapse: collapse; }
 .inventory-table th {

@@ -5,10 +5,20 @@ export default function Login({ onLogin, goToSignup }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
-    onLogin(email)
+    setError('')
+    setSubmitting(true)
+    try {
+      await onLogin(email, password)
+    } catch (err) {
+      setError(err.message || 'Could not sign in. Please try again.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -49,6 +59,7 @@ export default function Login({ onLogin, goToSignup }) {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
           />
+          {error && <p className="field-error" role="alert">{error}</p>}
         </div>
 
         <div className="remember-row">
@@ -61,8 +72,8 @@ export default function Login({ onLogin, goToSignup }) {
           <label htmlFor="login-remember">Stay signed in on this device</label>
         </div>
 
-        <button type="submit" className="btn-submit">
-          Sign in
+        <button type="submit" className="btn-submit" disabled={submitting}>
+          {submitting ? 'Signing in…' : 'Sign in'}
         </button>
       </form>
 

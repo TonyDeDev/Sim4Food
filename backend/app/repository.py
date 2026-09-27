@@ -6,6 +6,11 @@ generates - they're stored in each table's `external_id` column so later
 uploads (recipes, sales, purchases, inventory_counts) can resolve them back
 to the right row.
 
+`restaurant_id` throughout this module is always a real restaurants.id -
+the restaurant is created up front (owned by the signed-in user) via the
+Next.js /api/restaurants route, and app.auth.verify_restaurant_owner checks
+ownership before any of this runs. Nothing here bootstraps a restaurant row.
+
 Each handler resolves and validates every row first, then writes the whole
 file in one `executemany`. Sales files run to hundreds of rows, and a
 per-row round trip to a hosted database made a single upload take tens of
@@ -14,22 +19,6 @@ seconds.
 from datetime import date
 
 import asyncpg
-
-
-async def ensure_restaurant(conn: asyncpg.Connection, restaurant_id: str) -> str:
-    """Looks up (or bootstraps) the restaurant row for this restaurant_id, returning its UUID.
-
-    Multi-tenant accounts are out of scope for the MVP, so `restaurant_id` as
-    passed by the API is treated as a stable slug/name rather than a real UUID.
-    """
-    return await conn.fetchval(
-        """
-        INSERT INTO restaurants (name) VALUES ($1)
-        ON CONFLICT (name) DO UPDATE SET name = EXCLUDED.name
-        RETURNING id
-        """,
-        restaurant_id,
-    )
 
 
 async def _id_map(conn: asyncpg.Connection, table: str, restaurant_id: str) -> dict[str, str]:
@@ -229,16 +218,15 @@ async def persist_upload(
     handler = _HANDLERS[file_type]
     async with pool.acquire() as conn:
         async with conn.transaction():
-            restaurant_uuid = await ensure_restaurant(conn, restaurant_id)
             batch_id = await conn.fetchval(
                 """
                 INSERT INTO upload_batches (restaurant_id, file_type, file_name, row_count, status)
                 VALUES ($1, $2, $3, $4, 'pending')
                 RETURNING id
                 """,
-                restaurant_uuid, file_type, file_name, len(rows),
+                restaurant_id, file_type, file_name, len(rows),
             )
-            errors = await handler(conn, restaurant_uuid, rows) or []
+            errors = await handler(conn, restaurant_id, rows) or []
             status = "processed" if not errors else "failed"
             error_message = "; ".join(errors[:5]) if errors else None
             await conn.execute(

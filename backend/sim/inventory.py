@@ -1,30 +1,16 @@
-"""Estimates how long current stock will last, per ingredient.
+"""Current stock and historical usage per ingredient.
 
-days_remaining = qty_on_hand / average historical daily consumption
-
-This is a historical-average estimate, not the agent-based simulation's
-forecast - it only needs data already on hand (inventory_current, sales,
-recipes) and has no dependency on the simulation engine, so it can ship
-before forecast.py exists. Once that lands, it can replace avg_daily_consumption
-with a simulated per-day demand figure without changing this module's shape.
+Deliberately stops short of estimating how long stock will last. Average
+daily usage is honest historical arithmetic (same kind of computation
+waste.py already does), but the forward projection - "will this run out,
+and when" - depends on the agent-based simulation, not on anything this
+module can derive by itself. It surfaces only what's directly knowable:
+current quantity on hand, and average historical daily usage.
 """
 from collections import defaultdict
 from datetime import date
 
 from app.db import get_pool
-
-CRITICAL_DAYS = 1
-WATCH_DAYS = 3
-
-
-def _status(days_remaining: float | None) -> str:
-    if days_remaining is None:
-        return "unknown"
-    if days_remaining < CRITICAL_DAYS:
-        return "critical"
-    if days_remaining < WATCH_DAYS:
-        return "watch"
-    return "ok"
 
 
 def build_inventory_report(
@@ -58,46 +44,31 @@ def build_inventory_report(
         total_consumed = consumed_by_ingredient.get(ingredient_id, 0.0)
         avg_daily = total_consumed / num_days if num_days > 0 else 0.0
 
-        days_remaining = None
-        if qty_on_hand is not None and avg_daily > 0:
-            days_remaining = qty_on_hand / avg_daily
-
         rows.append({
             "ingredient_id": row["external_id"],
             "name": row["name"],
             "unit": row["unit"],
             "qty_on_hand": qty_on_hand,
             "avg_daily_consumption": round(avg_daily, 3) if avg_daily else 0.0,
-            "days_remaining": round(days_remaining, 1) if days_remaining is not None else None,
-            "status": _status(days_remaining),
         })
 
-    rows.sort(key=lambda r: (r["days_remaining"] is None, r["days_remaining"]))
-
-    summary = {"tracked": 0, "critical": 0, "watch": 0, "ok": 0}
-    for row in rows:
-        if row["qty_on_hand"] is not None:
-            summary["tracked"] += 1
-        if row["status"] in summary:
-            summary[row["status"]] += 1
-
-    return {"ingredients": rows, "summary": summary}
+    tracked = sum(1 for r in rows if r["qty_on_hand"] is not None)
+    return {
+        "ingredients": rows,
+        "summary": {"total": len(rows), "tracked": tracked, "missing_count": len(rows) - tracked},
+    }
 
 
 async def compute_inventory(restaurant_id: str) -> dict:
     pool = get_pool()
     async with pool.acquire() as conn:
-        restaurant_uuid = await conn.fetchval("SELECT id FROM restaurants WHERE name = $1", restaurant_id)
-        if restaurant_uuid is None:
-            return {"ingredients": [], "summary": {"tracked": 0, "critical": 0, "watch": 0, "ok": 0}}
-
         ingredients = await conn.fetch(
             "SELECT id, external_id, name, unit FROM ingredients WHERE restaurant_id = $1 ORDER BY external_id",
-            restaurant_uuid,
+            restaurant_id,
         )
         stock = await conn.fetch(
             "SELECT ingredient_id, qty_on_hand FROM inventory_current WHERE restaurant_id = $1",
-            restaurant_uuid,
+            restaurant_id,
         )
         consumption = await conn.fetch(
             """
@@ -107,7 +78,7 @@ async def compute_inventory(restaurant_id: str) -> dict:
             WHERE s.restaurant_id = $1
             ORDER BY s.date, r.ingredient_id
             """,
-            restaurant_uuid,
+            restaurant_id,
         )
 
     return build_inventory_report(

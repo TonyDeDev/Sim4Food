@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import AuthLayout from '../components/AuthLayout.jsx'
+import { isValidEmail, passwordError } from '../utils/validation.js'
 
 export default function Signup({ onSignup, goToLogin }) {
   const [first, setFirst] = useState('')
@@ -8,21 +9,33 @@ export default function Signup({ onSignup, goToLogin }) {
   const [password, setPassword] = useState('')
   const [password2, setPassword2] = useState('')
   const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
 
+    if (!isValidEmail(email)) {
+      setError('Please enter a valid email address.')
+      return
+    }
     if (password !== password2) {
       setError("Passwords don't match.")
       return
     }
-    if (password.length < 8) {
-      setError('Password must be at least 8 characters.')
+    const passwordIssue = passwordError(password)
+    if (passwordIssue) {
+      setError(passwordIssue)
       return
     }
 
     setError('')
-    onSignup({ first, last, email, password })
+    setSubmitting(true)
+    try {
+      await onSignup({ first, last, email, password })
+    } catch (err) {
+      setError(err.message || 'Could not create your account. Please try again.')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -84,7 +97,7 @@ export default function Signup({ onSignup, goToLogin }) {
           <input
             id="signup-password"
             type="password"
-            placeholder="At least 8 characters"
+            placeholder="At least 8 characters, with a number and a symbol"
             autoComplete="new-password"
             required
             minLength={8}
@@ -107,8 +120,8 @@ export default function Signup({ onSignup, goToLogin }) {
           <p className="field-error">{error}</p>
         </div>
 
-        <button type="submit" className="btn-submit">
-          Create account
+        <button type="submit" className="btn-submit" disabled={submitting}>
+          {submitting ? 'Creating account…' : 'Create account'}
         </button>
       </form>
     </AuthLayout>

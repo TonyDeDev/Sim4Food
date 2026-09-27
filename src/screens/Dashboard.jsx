@@ -4,7 +4,7 @@ import AddBusinessModal from '../components/AddBusinessModal.jsx'
 import BusinessDetailsPanel from '../components/BusinessDetailsPanel.jsx'
 import RecordUploadCard from '../components/RecordUploadCard.jsx'
 import InventoryOverview from '../components/InventoryOverview.jsx'
-import { RECORD_FIELDS } from '../utils/api.js'
+import { createRestaurant, RECORD_FIELDS } from '../utils/api.js'
 
 const TABS = [
   { key: 'records', label: 'Records' },
@@ -27,8 +27,13 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
     setModalOpen(true)
   }
 
-  function handleSubmit(newBusiness) {
-    const addedBusiness = { id: `biz-${Date.now()}`, files: {}, ...newBusiness }
+  // Throws on failure - AddBusinessModal awaits this and keeps itself open
+  // to show the error, only calling reset()/closing on success.
+  async function handleSubmit(newBusiness) {
+    const restaurant = await createRestaurant(newBusiness)
+    const addedBusiness = {
+      id: restaurant.id, name: restaurant.name, type: newBusiness.type, location: newBusiness.location, files: {},
+    }
     onAddBusiness(addedBusiness)
     setActiveId(addedBusiness.id)
     setModalOpen(false)
@@ -99,7 +104,7 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
                     key={key}
                     fieldKey={key}
                     label={label}
-                    restaurantId={selectedBusiness.name}
+                    restaurantId={selectedBusiness.id}
                     currentFile={selectedBusiness.files?.[key]}
                     onUploaded={handleRecordUploaded}
                   />
@@ -107,7 +112,7 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
               </section>
             )}
 
-            {activeTab === 'inventory' && <InventoryOverview />}
+            {activeTab === 'inventory' && <InventoryOverview restaurantId={selectedBusiness.id} />}
           </>
         )}
       </main>

@@ -5,18 +5,34 @@ CREATE TYPE upload_status AS ENUM ('pending', 'processed', 'failed');
 CREATE TYPE count_source AS ENUM ('manual', 'computed');
 CREATE TYPE event_type AS ENUM ('holiday', 'deal');
 
-CREATE TABLE restaurants (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name TEXT NOT NULL UNIQUE,
-    timezone TEXT NOT NULL DEFAULT 'UTC',
-    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email TEXT NOT NULL UNIQUE,
-    restaurant_id UUID REFERENCES restaurants(id) ON DELETE CASCADE,
+    password_hash TEXT NOT NULL,
+    first_name TEXT NOT NULL,
+    last_name TEXT NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE TABLE sessions (
+    token TEXT PRIMARY KEY,
+    user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX idx_sessions_user ON sessions (user_id);
+
+-- One user can own several restaurants (the dashboard supports multiple
+-- businesses), so name is unique per owner rather than globally.
+CREATE TABLE restaurants (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    owner_user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    name TEXT NOT NULL,
+    business_type TEXT,
+    location TEXT,
+    timezone TEXT NOT NULL DEFAULT 'UTC',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (owner_user_id, name)
 );
 
 CREATE TABLE ingredients (

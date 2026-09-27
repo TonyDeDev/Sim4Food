@@ -8,6 +8,8 @@ export default function AddBusinessModal({ open, onClose, onSubmit }) {
   const [suggestionsOpen, setSuggestionsOpen] = useState(false)
   const [loadingLocations, setLoadingLocations] = useState(false)
   const [locationError, setLocationError] = useState('')
+  const [submitError, setSubmitError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
   const locationTimer = useRef(null)
   const requestRef = useRef(null)
   const locationRef = useRef(null)
@@ -19,6 +21,7 @@ export default function AddBusinessModal({ open, onClose, onSubmit }) {
     setLocation('')
     setSuggestions([])
     setSuggestionsOpen(false)
+    setSubmitError('')
   }, [open])
 
   useEffect(() => () => {
@@ -28,7 +31,7 @@ export default function AddBusinessModal({ open, onClose, onSubmit }) {
 
   if (!open) return null
 
-  const ready = Boolean(name.trim() && type.trim() && location.trim())
+  const ready = !submitting && Boolean(name.trim() && type.trim() && location.trim())
 
   function reset() {
     clearTimeout(locationTimer.current)
@@ -85,11 +88,18 @@ export default function AddBusinessModal({ open, onClose, onSubmit }) {
     }, 500)
   }
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault()
     if (!ready) return
-    onSubmit({ name: name.trim(), type: type.trim(), location: location.trim() })
-    reset()
+    setSubmitError('')
+    setSubmitting(true)
+    try {
+      await onSubmit({ name: name.trim(), type: type.trim(), location: location.trim() })
+      reset()
+    } catch (error) {
+      setSubmitError(error.message || 'Could not add business. Please try again.')
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -142,9 +152,13 @@ export default function AddBusinessModal({ open, onClose, onSubmit }) {
           )}
           </div>
 
+          {submitError && <p className="field-error" role="alert">{submitError}</p>}
+
           <div className="modal-actions">
-            <button type="button" className="btn-outline-modal" onClick={handleClose}>Cancel</button>
-            <button type="submit" className="btn-submit-modal" disabled={!ready}>Add business</button>
+            <button type="button" className="btn-outline-modal" onClick={handleClose} disabled={submitting}>Cancel</button>
+            <button type="submit" className="btn-submit-modal" disabled={!ready}>
+              {submitting ? 'Adding…' : 'Add business'}
+            </button>
           </div>
         </form>
       </div>
