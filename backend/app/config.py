@@ -17,6 +17,13 @@ class Settings(BaseSettings):
     # the discrete postgres_* fields above when set.
     postgres_url: str | None = None
     cors_origins: str = "http://localhost:3000"
+    # Snowflake Cortex (AI summary and chat, see docs/snowflake-cortex.md).
+    # snowflake_account is the <org>-<account> identifier, e.g. from
+    # app.snowflake.com/<org>/<account>/ -> "<org>-<account>".
+    snowflake_account: str | None = None
+    snowflake_pat: str | None = None
+    cortex_model: str = "claude-sonnet-4-5"
+    cortex_timeout_s: float = 60.0
 
     @property
     def database_url(self) -> str:

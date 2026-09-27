@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
-from app import db, repository
+from app import db, insights, repository
 from app.auth import get_current_user_id, verify_restaurant_owner
 from app.config import settings
 from sim import backtest, forecast_store, generator, home_summary, ingest, inventory, waste
@@ -31,6 +31,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.include_router(insights.router)
 
 
 @app.get("/api/demo")
