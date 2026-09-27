@@ -49,3 +49,6 @@ __pycache__/
 # vite (frontend-design)
 /dist
 *.local
+
+# trained forecasting models
+backend/models/

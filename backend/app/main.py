@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 from contextlib import asynccontextmanager
@@ -9,6 +10,8 @@ from app import db, repository
 from app.auth import get_current_user_id, verify_restaurant_owner
 from app.config import settings
 from sim import backtest, generator, ingest, inventory, waste
+from sim.dataset import load_frames
+from sim.forecast_payload import build_forecast_payload
 
 
 @asynccontextmanager
@@ -73,3 +76,12 @@ async def post_simulate(restaurant_id: str, scenario: dict, user_id: str = Depen
 async def get_backtest(restaurant_id: str, user_id: str = Depends(get_current_user_id)):
     await verify_restaurant_owner(restaurant_id, user_id)
     return backtest.run_backtest(restaurant_id)
+
+
+@app.get("/api/forecast")
+async def get_forecast(restaurant_id: str, user_id: str = Depends(get_current_user_id)):
+    """Next week's ingredient usage forecast with P10/P50/P90 bands, history, backtest and data status."""
+    await verify_restaurant_owner(restaurant_id, user_id)
+    frames = await load_frames(restaurant_id)
+    # Training is CPU bound, keep it off the event loop.
+    return await asyncio.to_thread(build_forecast_payload, frames)
