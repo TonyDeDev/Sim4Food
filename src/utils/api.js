@@ -1,4 +1,7 @@
-export const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+// Strip any trailing slash so a `.env` value like "http://localhost:8000/"
+// doesn't produce a double-slash path (e.g. ":8000//api/inventory") that
+// FastAPI's router won't match.
+export const API_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000').replace(/\/+$/, '')
 
 export const RECORD_FIELDS = [
   { key: 'ingredients', label: 'Ingredients' },
