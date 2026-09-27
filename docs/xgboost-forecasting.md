@@ -30,7 +30,11 @@ Historical purchases are not necessarily what the restaurant needed, so they are
 | `backend/sim/dish_features.py` | Daily dish-level point-in-time matrix with a ratio target (`build_dish_matrix`). |
 | `backend/sim/train_dish_xgb.py` | CLI: train the dish-level model, convert to ingredient usage, evaluate, print next week forecast. |
 | `backend/tests/test_features.py` | Unit tests for the ingredient-level matrix, including leakage tests. |
+| `backend/sim/forecast_backtest.py` | CLI: rolling-origin backtest, residual P10/P50/P90 bands, coverage check, next week forecast with bands. |
+| `backend/sim/forecast_payload.py` | Builds the JSON payload for the frontend: history, forecast with bands, backtest, data status. |
+| `backend/app/main.py` | Adds `GET /api/forecast?restaurant_id=<name>` (404 for unknown restaurants). |
 | `backend/tests/test_dish_features.py` | Unit tests for the dish-level matrix, including leakage tests. |
+| `backend/tests/test_forecast_backtest.py` | Unit tests for bands, coverage and leakage in the rolling backtest. |
 
 ## Training grain and target
 
@@ -226,9 +230,100 @@ First result on the demo CSVs (ingredient-week level, test weeks 2026-09-07 and 
 | naive last week | 6.20 | 0.052 |
 | 4 week mean | 6.09 | 0.051 |
 
-This beats the ingredient-level model (WAPE 0.062 to 0.074) and all baselines.
-Treat it as promising, not proven: the test set is only 2 weeks, the demo data contains no events in those weeks, and early stopping picked a very small number of trees.
-A rolling-origin backtest over more weeks is the next check.
+This single split looked good, but it turned out to be a lucky pair of weeks.
+The rolling backtest below is the number to trust.
+
+## Rolling backtest and P10 to P90 bands
+
+`sim/forecast_backtest.py` retrains the dish-level model for every origin week T using only earlier weeks (early stopping on the 2 weeks just before T), forecasts week T, and converts to ingredient usage.
+With 12 weeks of data this gives 6 out-of-sample origins and 72 ingredient-weeks.
+
+Accuracy on the demo CSVs across all origins:
+
+| Model | MAE | WAPE |
+|---|---|---|
+| dish level XGBoost, ratio target | 6.78 | 0.056 |
+| dish baseline only (same weekday mean) | 6.96 | 0.057 |
+| naive last week | 8.61 | 0.071 |
+| 4 week mean | 6.96 | 0.057 |
+
+Reading this honestly:
+
+- XGBoost beats last week's usage clearly and ties the same weekday baseline (0.056 versus 0.057).
+- On single weeks it wins some and loses some, so on 12 weeks of data it has not yet shown a reliable edge over its own baseline.
+- The demo data has no events in most origin weeks, which is where the model is meant to add value.
+
+### Bands
+
+The forecast is a single number, so uncertainty is added from past errors.
+
+- For each out-of-sample forecast, compute `actual / predicted`.
+- Pool these ratios across ingredients (too few per ingredient) and take the 10th, 50th and 90th percentiles.
+- Percentiles use a finite-sample (split conformal) rank: `ceil((n + 1) q)` for upper and `floor((n + 1) q)` for lower quantiles, falling back to the sample max or min when n is small.
+  A plain percentile of few errors is too narrow on new data, and this correction widens it.
+- Multiply a new forecast by those three multipliers to get P10, P50 and P90.
+- Errors are relative, so an ingredient used in large quantities gets a proportionally larger band.
+
+Coverage check, where each week's bands use only errors from earlier origins (ideal: 0.80 inside, 0.10 below, 0.10 above):
+
+| Bands | Inside P10 to P90 | Below P10 | Above P90 | Points |
+|---|---|---|---|---|
+| Plain percentiles | 0.583 | 0.150 | 0.267 | 60 |
+| Conformal corrected | 0.683 | 0.133 | 0.183 | 60 |
+
+The correction helps (58% to 68%) but is still under 80%.
+Per week the coverage swings from 58% to 92%.
+That is because errors are strongly correlated inside a week: a busy week runs high for every ingredient at once, and ingredients like beef patty and bun share the same driver dish.
+The 60 points are therefore closer to 5 independent weeks, and the coverage estimate itself is noisy.
+
+The bands are a working first version.
+They should not be shown to owners as calibrated until they are re-checked on more weeks.
+
+Ideas to improve coverage, in order:
+
+- Get more history, so bands come from more independent weeks.
+- Calibrate bands from dish-day errors, where there are far more independent points, and propagate them to ingredients.
+- Widen the bands for weeks with events or holidays, where errors are larger.
+
+## Frontend payload and data status
+
+`GET /api/forecast?restaurant_id=<restaurants.name>` returns everything a forecast page needs in one response.
+It takes under a second on the demo data.
+Training runs in a worker thread so it does not block the API event loop.
+
+```
+data:        weeks_of_history, first_week, last_week, forecast_week, method, status, message
+accuracy:    backtest_weeks, methods{xgboost, dish_baseline, naive_last_week, mean_4w}{mae, wape},
+             band_coverage{inside_p10_p90, below_p10, above_p90, n, target_inside}
+ingredients: [{ ingredient_id, name, unit,
+                history:  [{week, usage}],
+                forecast: {week, point, p10, p50, p90},
+                backtest: [{week, actual, predicted, p10, p90}] }]
+```
+
+- The in-progress week is dropped, so a partial week is never read as a slow week.
+  The forecast is for the first week after the last complete week.
+- `p10` and `p90` in a backtest row are null for the first origin, which has no earlier errors to build a band from.
+- With fewer than 3 usable weeks the model cannot train.
+  `method` is then `baseline` (same weekday average), `accuracy` is null and the bands are null.
+  This is a necessity for tiny data, not an accuracy based fallback.
+- The payload is strict JSON: no NaN, and every missing number is null.
+
+### Data status ("learning mode")
+
+`data.status` and `data.message` tell the UI how much history the forecast rests on.
+It is only a label and never changes the forecast.
+
+| Weeks of history | `status` | Meaning |
+|---|---|---|
+| under 8 | `learning` | Rough estimates, upload older sales. |
+| 8 to 25 | `improving` | Getting sharper, upload older sales to unlock seasonal and holiday patterns. |
+| 26 or more | `established` | No warning. |
+
+The UI can also compare `band_coverage.inside_p10_p90` with `target_inside` (0.80) to say whether the ranges have been validated.
+
+Not in the payload yet: order quantity, expected waste, stockout risk and savings.
+They need the recommendation step (stock on hand, newsvendor rule, shelf life cap, pack rounding).
 
 ## How to run
 
@@ -240,6 +335,8 @@ python -m venv .venv
 .venv\Scripts\python -m pytest
 .venv\Scripts\python -m sim.train_xgb --restaurant "<restaurants.name>"        # ingredient level (V1)
 .venv\Scripts\python -m sim.train_dish_xgb --restaurant "<restaurants.name>"   # dish level, ratio target (V1b)
+.venv\Scripts\python -m sim.forecast_backtest --restaurant "<restaurants.name>" # rolling backtest and bands
+.venv\Scripts\python -m sim.forecast_backtest --csv-dir data/demo               # same, offline from demo CSVs
 ```
 
 - `POSTGRES_URL` must be set in `backend/.env` (Neon connection string, never committed).

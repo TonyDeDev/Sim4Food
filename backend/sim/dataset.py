@@ -61,3 +61,23 @@ async def load_frames(restaurant_name: str) -> dict:
         "counts": frame(counts, ["date", "ingredient_id", "qty_on_hand"]),
         "events": frame(events, ["type", "start_date", "end_date", "items", "discount_pct", "expected_lift"]),
     }
+
+
+def load_frames_from_csv(directory: str, restaurant_id: str = "demo") -> dict:
+    """Same frames as load_frames, from the demo CSV files (offline, no database)."""
+    from pathlib import Path
+
+    d = Path(directory)
+    sales = pd.read_csv(d / "sales.csv").rename(columns={"item_id": "menu_item_id"})
+    recipes = pd.read_csv(d / "recipes.csv").rename(columns={"item_id": "menu_item_id"})
+    events = pd.read_csv(d / "events.csv")
+    events["items"] = events["items"].fillna("").apply(lambda s: [i.strip() for i in s.split(",") if i.strip()])
+    return {
+        "restaurant_id": restaurant_id,
+        "sales": sales,
+        "recipes": recipes,
+        "ingredients": pd.read_csv(d / "ingredients.csv"),
+        "purchases": pd.read_csv(d / "purchases.csv"),
+        "counts": pd.read_csv(d / "inventory_counts.csv"),
+        "events": events,
+    }

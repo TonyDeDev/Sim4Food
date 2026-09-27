@@ -1,13 +1,16 @@
+import asyncio
 import csv
 import io
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, UploadFile
+from fastapi import FastAPI, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app import db, repository
 from app.config import settings
 from sim import backtest, generator, ingest, waste
+from sim.dataset import load_frames
+from sim.forecast_payload import build_forecast_payload
 
 
 @asynccontextmanager
@@ -58,3 +61,14 @@ async def post_simulate(restaurant_id: str, scenario: dict):
 @app.get("/api/backtest")
 async def get_backtest(restaurant_id: str):
     return backtest.run_backtest(restaurant_id)
+
+
+@app.get("/api/forecast")
+async def get_forecast(restaurant_id: str):
+    """Next week's ingredient usage forecast with P10/P50/P90 bands, history, backtest and data status."""
+    try:
+        frames = await load_frames(restaurant_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail=f"Unknown restaurant: {restaurant_id}")
+    # Training is CPU bound, keep it off the event loop.
+    return await asyncio.to_thread(build_forecast_payload, frames)
