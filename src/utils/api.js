@@ -1,7 +1,8 @@
-// Proxy browser calls through Next.js instead of calling FastAPI's different
-// localhost port directly. It avoids CORS failures and forwards the existing
-// same-host session cookie to the Python service.
-export const API_URL = '/backend-api'
+// All backend calls go through the /py/* rewrite in next.config.ts, so this
+// is always same-origin - no cross-origin cookie concerns, no env var needed
+// in this file. The backend's own real URL lives server-side only, in the
+// BACKEND_URL env var that next.config.ts reads.
+export const API_URL = '/py'
 
 export const RECORD_FIELDS = [
   { key: 'ingredients', label: 'Ingredients' },
@@ -13,8 +14,10 @@ export const RECORD_FIELDS = [
   { key: 'events', label: 'Deals and holidays' },
 ]
 
-// The Next.js rewrite keeps these browser requests same-origin. Credentials
-// are still included so the rewrite forwards the active session cookie.
+// FastAPI is reached through the /py/* same-origin proxy (see
+// next.config.ts), so the session cookie is sent automatically like any
+// other same-origin request. credentials: 'include' is kept below for
+// robustness but is no longer load-bearing for the cookie to arrive.
 export async function fetchInventory(restaurantId) {
   const params = new URLSearchParams({ restaurant_id: restaurantId })
   const response = await fetch(`${API_URL}/api/inventory?${params}`, { credentials: 'include' })

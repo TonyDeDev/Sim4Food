@@ -159,5 +159,6 @@ Priority legend:
 | P1-12 | Fixed | Documented lint exception: the root App Router layout loads the fonts for every page. |
 | P2 | Partly fixed | "Forecast confidence" is now "Range hit rate"; the Home tile no longer points to a missing Planner; tab buttons lost their browser-default borders; the sidebar email truncates. |
 | New | Added | Snowflake Cortex order summary and chat, see [snowflake-cortex.md](snowflake-cortex.md). |
+| P0-4 | Fixed | Browser calls proxy through Next.js `rewrites()` (`/py/:path*` -> `BACKEND_URL`, see `next.config.ts`); `src/utils/api.js`'s `API_URL` is now the relative `/py` prefix; the session cookie is `secure` in production. FastAPI's CORS is no longer load-bearing for this (server-to-server calls aren't subject to it) but is kept for local-dev/direct access. |
 
-Not touched here (owned by the simulation work or out of this branch's scope): P0-1, P0-2, P0-4, P0-5, P0-7, P0-8, P0-9 and the other P1 items.
+Not touched here (owned by the simulation work or out of this branch's scope): P0-1, P0-2, P0-5, P0-7, P0-8, P0-9 and the other P1 items.

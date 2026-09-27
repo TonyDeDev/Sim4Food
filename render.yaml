@@ -1,0 +1,46 @@
+# Render Blueprint for the FastAPI backend (the Next.js frontend lives on Vercel).
+#
+# Create it with: Render dashboard -> New -> Blueprint -> this repo, branch main.
+# Render reads this file from the default branch, so it must be pushed first.
+#
+# Keeping the service definition here rather than in the dashboard means the
+# hosting config is reviewable, reproducible, and not trapped in one person's
+# browser session.
+services:
+  - type: web
+    name: sim4food-api
+    runtime: python
+    plan: free
+    # Neon runs in us-east-2, which Render calls "ohio". The backend is chatty
+    # with Postgres (asyncpg opens a 10-connection pool at boot), so keep that
+    # hop inside one region.
+    region: ohio
+    # app/main.py imports the top-level `app` and `sim` packages, so the working
+    # directory has to be backend/, not the repo root.
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    # The uvicorn console script puts the working directory on sys.path, so no
+    # PYTHONPATH is needed here. Never --reload: that is dev-only.
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    # FastAPI serves /openapi.json automatically, with no database and no auth,
+    # which makes it the only zero-cost 200 this app has. There is deliberately
+    # no /api/health route on the backend (that one exists on the Next.js side),
+    # and GET / is a 404 - pointing the check at either would fail every probe
+    # and crash-loop the service. Switch this if a real health route is added.
+    healthCheckPath: /openapi.json
+    autoDeploy: true
+    envVars:
+      # Match the interpreter the code is actually tested against. Without a pin
+      # Render picks its own default, currently 3.13.
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      # sync: false means "prompt for this in the dashboard, never store it in
+      # git". Render asks for each one when the Blueprint is first created.
+      - key: POSTGRES_URL
+        sync: false
+      - key: SNOWFLAKE_ACCOUNT
+        sync: false
+      - key: SNOWFLAKE_PAT
+        sync: false
+      - key: CORTEX_MODEL
+        value: claude-sonnet-4-5
