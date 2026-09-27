@@ -1,7 +1,7 @@
 """Loads and validates uploaded CSV files.
 
-Each of the 6 upload types (ingredients, menu, recipes, sales, purchases,
-inventory_counts) is validated independently here: required columns present,
+Each of the 7 upload types (ingredients, menu, recipes, sales, purchases,
+inventory_counts, events) is validated independently here: required columns present,
 numeric/date fields parseable, no duplicate ids. Cross-file references (e.g.
 a recipes row's ingredient_id actually existing) are checked at persistence
 time against the database, not here, since this function only sees one
@@ -16,13 +16,19 @@ REQUIRED_COLUMNS = {
     "sales": ["date", "item_id", "qty_sold", "avg_price"],
     "purchases": ["date", "ingredient_id", "qty", "unit_cost", "total"],
     "inventory_counts": ["date", "ingredient_id", "qty_on_hand"],
+    "events": ["start_date", "end_date", "type", "name"],
 }
+
+EVENT_TYPES = {"holiday", "deal"}
 
 # effective_date (YYYY-MM-DD) back-dates a changed value in the change log. Without
 # it a change is effective from the moment of upload.
 OPTIONAL_COLUMNS = {
     "ingredients": ["shelf_life_days", "effective_date"],
     "recipes": ["effective_date"],
+    # items: menu item ids separated by commas (empty = every dish).
+    # discount_pct / expected_lift: fractions (0.2) or percentages (20).
+    "events": ["items", "discount_pct", "expected_lift"],
 }
 
 NUMERIC_COLUMNS = {
@@ -32,6 +38,7 @@ NUMERIC_COLUMNS = {
     "sales": ["qty_sold", "avg_price"],
     "purchases": ["qty", "unit_cost", "total"],
     "inventory_counts": ["qty_on_hand"],
+    "events": ["discount_pct", "expected_lift"],
 }
 
 DATE_COLUMNS = {
@@ -40,6 +47,7 @@ DATE_COLUMNS = {
     "sales": ["date"],
     "purchases": ["date"],
     "inventory_counts": ["date"],
+    "events": ["start_date", "end_date"],
 }
 
 ID_COLUMNS = {
@@ -58,6 +66,17 @@ def _is_valid_date(value) -> bool:
         return True
     except ValueError:
         return False
+
+
+def _event_errors(row: dict, line: int) -> list[str]:
+    errors = []
+    kind = str(row.get("type", "")).strip().lower()
+    if kind not in EVENT_TYPES:
+        errors.append(f"line {line}: type must be holiday or deal: {row.get('type')!r}")
+    if _is_valid_date(row.get("start_date")) and _is_valid_date(row.get("end_date")):
+        if str(row["end_date"]) < str(row["start_date"]):
+            errors.append(f"line {line}: end_date is before start_date")
+    return errors
 
 
 def validate_upload(file_type: str, rows: list[dict]) -> dict:
@@ -100,6 +119,9 @@ def validate_upload(file_type: str, rows: list[dict]) -> dict:
                 continue
             if not _is_valid_date(row.get(col)):
                 errors.append(f"line {line}: {col} is not a valid date (YYYY-MM-DD): {row.get(col)!r}")
+
+        if file_type == "events":
+            errors.extend(_event_errors(row, line))
 
         if id_col:
             row_id = row[id_col]
