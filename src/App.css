@@ -236,7 +236,12 @@ form.stack {
 
 /* ================= App shell (dashboard) ================= */
 .app-shell {
-  min-height: 100%;
+  /* A ceiling, not just a floor - .main already scrolls its own overflow
+     (overflow-y: auto below) and .biz-list scrolls its own list, but neither
+     mattered while min-height let the whole shell grow past the viewport
+     with tall page content, dragging the sidebar along with it instead of
+     leaving it pinned at a fixed, screen-height size. */
+  height: 100%;
   display: flex;
 }
 
@@ -893,7 +898,10 @@ form.stack {
    actually mean something (the delta line, and a tone override on cards
    like Stock health where the number itself is a status). A plain fact like
    revenue or a waste cost shouldn't be tinted green, which reads as "good". */
-.stat-value { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 600; color: var(--ink); }
+.stat-value { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 600; color: var(--ink); overflow-wrap: anywhere; }
+/* A short number/status fits fine at 28px; free text like an event name
+   needs to shrink and wrap rather than overflow the card. */
+.stat-value.is-long-text { font-size: 18px; line-height: 1.25; }
 .stat-sub { margin: 6px 0 0; font-size: 12px; color: var(--ink-faint); }
 .stat-delta { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: var(--ink-faint); }
 .stat-delta.up { color: var(--fresh-green); }

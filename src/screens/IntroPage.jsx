@@ -13,29 +13,57 @@ function ArrowIcon() {
   return <svg viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M3.75 10h12.5m-5-5 5 5-5 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" /></svg>
 }
 
+// The actual Home tab (InventoryOverview.jsx), reusing its real classes
+// (stat-card, inventory-table, badge-*, already loaded globally via App.css)
+// with static sample numbers - a live per-user dashboard can't be shown on a
+// public marketing page, but the layout, labels and styling are the real ones.
 function DashboardPreview() {
   return (
-    <div className="preview-wrap" role="img" aria-label="Illustrative sample Sim4Food dashboard showing a kitchen activity chart and food-use suggestion">
+    <div className="preview-wrap" role="img" aria-label="Sample Sim4Food dashboard showing revenue, waste cost, stock health, an upcoming event, and ingredient stock levels">
       <div className="preview-card">
         <div className="preview-topline">
           <div className="preview-brand"><Mark /><span>sim4food</span></div>
           <span className="preview-sample">SAMPLE VIEW</span>
         </div>
         <div className="preview-title-row">
-          <div><span className="preview-overline">YOUR KITCHEN SNAPSHOT</span><h2>Good morning, Maya</h2></div>
-          <div className="preview-avatar">M</div>
+          <div><span className="preview-overline">HOME · THE CORNER CAFÉ</span><h2>This week at a glance</h2></div>
         </div>
-        <div className="preview-metrics">
-          <div className="preview-metric"><span>Food tracked</span><strong>18.6 <small>kg</small></strong><em>across this week</em></div>
-          <div className="preview-ring" aria-hidden="true"><span>↗</span></div>
+
+        <div className="stat-grid preview-stat-grid" aria-hidden="true">
+          <div className="stat-card">
+            <p className="stat-label">Revenue (7 days)</p>
+            <p className="stat-value">$3,240</p>
+            <p className="stat-delta up">+8% vs prior week</p>
+          </div>
+          <div className="stat-card">
+            <p className="stat-label">Waste cost (last week)</p>
+            <p className="stat-value">$164</p>
+            <p className="stat-delta up">-15% vs prior week</p>
+          </div>
+          <div className="stat-card stat-card-warn">
+            <p className="stat-label">Stock health</p>
+            <p className="stat-value">1 low</p>
+            <p className="stat-sub">Basil: 2.4d left</p>
+          </div>
+          <div className="stat-card">
+            <p className="stat-label">Next event</p>
+            <p className="stat-value is-long-text">Fall Harvest Deal</p>
+            <p className="stat-sub">in 5 days</p>
+          </div>
         </div>
-        <div className="preview-chart-head"><strong>Kitchen activity</strong><span>THIS WEEK</span></div>
-        <div className="preview-chart" aria-hidden="true">
-          {[35, 58, 43, 79, 52, 68, 40].map((height, index) => (
-            <div className="chart-column" key={index}><i style={{ height: `${height}%` }} /><span>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][index]}</span></div>
-          ))}
+
+        <div className="inventory-table-wrap preview-table-wrap" aria-hidden="true">
+          <table className="inventory-table">
+            <thead>
+              <tr><th>Ingredient</th><th>On hand</th><th>Avg. used / day</th><th>Est. runway</th><th>Status</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>Chicken breast</td><td>4.2 kg</td><td>0.6 kg</td><td>7.0 days</td><td><span className="badge badge-good">OK</span></td></tr>
+              <tr><td>Basil</td><td>0.3 kg</td><td>0.15 kg</td><td>2.0 days</td><td><span className="badge badge-warn">Low</span></td></tr>
+              <tr><td>Romaine lettuce</td><td>0 kg</td><td>0.4 kg</td><td>0.0 days</td><td><span className="badge badge-bad">Out</span></td></tr>
+            </tbody>
+          </table>
         </div>
-        <div className="preview-tip"><span className="tip-spark">✦</span><p><strong>A little nudge</strong><br />Use leafy greens first in tomorrow’s prep.</p><span className="tip-arrow">↗</span></div>
       </div>
     </div>
   )
@@ -81,8 +109,8 @@ export default function IntroPage({ onLogin, onSignup }) {
         <section className="intro-hero" id="home">
           <div className="hero-copy" data-reveal>
             <div className="hero-kicker"><span className="kicker-dot" /> FOOD WASTE, MADE VISIBLE</div>
-            <h1>Make every<br />ingredient count.</h1>
-            <p className="hero-description">A clearer picture of what comes in, what goes out, and where your kitchen can do better.</p>
+            <h1 className="hero-headline-stat">Canada loses $58 billion<br />worth of food every year.</h1>
+            <p className="hero-description">Waste less. Save more. Make an impact.</p>
             <div className="hero-actions">
               <button className="hero-primary" onClick={onLogin}>Log in to Sim4Food <ArrowIcon /></button>
               <a className="hero-secondary" href="#how-it-works">Explore the idea <span>↓</span></a>

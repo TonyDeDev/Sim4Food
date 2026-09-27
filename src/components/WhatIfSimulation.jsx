@@ -142,7 +142,7 @@ export default function WhatIfSimulation({ restaurantId, restaurantName }) {
     {error && <section className="alert-card" role="alert"><h2>Simulation could not run</h2><p>{error}</p></section>}
     {result && <section className="whatif-results" aria-label="Simulation results">
       <h2>What to do next week</h2>
-      <p className="hint">{result.runs} simulated weeks. Your usual ordering rule and the recommendation face the identical weeks, so the only difference is what you buy and when it arrives.</p>
+      <p className="hint">We ran next week {result.runs} times. Your usual ordering rule and the recommendation face the identical {result.runs} versions of it, so the only difference is what you buy and when it arrives.</p>
 
       {result.replay && <SimView
         key={runSeq}
