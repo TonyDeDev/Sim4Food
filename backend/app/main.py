@@ -1,6 +1,7 @@
 import asyncio
 import csv
 import io
+from datetime import date
 from contextlib import asynccontextmanager
 
 from fastapi import Depends, FastAPI, UploadFile
@@ -99,12 +100,15 @@ async def get_forecast(restaurant_id: str, user_id: str = Depends(get_current_us
 
 
 @app.post("/api/forecast")
-async def post_forecast(restaurant_id: str, user_id: str = Depends(get_current_user_id)):
-    """Runs the forecast now (next week's ingredient usage, P10/P50/P90 bands,
-    history, backtest and data status) and stores it as the latest run."""
+async def post_forecast(
+    restaurant_id: str, target_week: date | None = None, user_id: str = Depends(get_current_user_id)
+):
+    """Runs the forecast now (target week's ingredient usage with P10/P50/P90
+    bands, order recommendations, savings, history, backtest and data status)
+    and stores it as the latest run. target_week defaults to next week."""
     await verify_restaurant_owner(restaurant_id, user_id)
     frames = await load_frames(restaurant_id)
     # Training is CPU bound, keep it off the event loop.
-    payload = await asyncio.to_thread(build_forecast_payload, frames)
+    payload = await asyncio.to_thread(build_forecast_payload, frames, None, target_week)
     run_at = await forecast_store.save_run(db.get_pool(), restaurant_id, payload)
     return {"run_at": run_at, "forecast": payload}

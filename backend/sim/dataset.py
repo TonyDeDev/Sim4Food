@@ -47,9 +47,14 @@ async def load_frames(restaurant_id: str) -> dict:
             restaurant_id,
         )
         events = await conn.fetch(
-            "SELECT type::text AS type, start_date, end_date, items::text[] AS items, "
+            "SELECT type::text AS type, name, start_date, end_date, items::text[] AS items, "
             "discount_pct::float8 AS discount_pct, expected_lift::float8 AS expected_lift "
             "FROM events WHERE restaurant_id = $1 ORDER BY start_date",
+            restaurant_id,
+        )
+        menu = await conn.fetch(
+            "SELECT id::text AS menu_item_id, external_id, name, price::float8 AS price "
+            "FROM menu_items WHERE restaurant_id = $1 ORDER BY external_id",
             restaurant_id,
         )
 
@@ -71,7 +76,8 @@ async def load_frames(restaurant_id: str) -> dict:
         ),
         "purchases": frame(purchases, ["date", "ingredient_id", "qty"]),
         "counts": frame(counts, ["date", "ingredient_id", "qty_on_hand"]),
-        "events": frame(events, ["type", "start_date", "end_date", "items", "discount_pct", "expected_lift"]),
+        "events": frame(events, ["type", "name", "start_date", "end_date", "items", "discount_pct", "expected_lift"]),
+        "menu": frame(menu, ["menu_item_id", "external_id", "name", "price"]),
         # Every version of each row with its valid_from / valid_to, see sim.history.
         "ingredient_versions": ingredient_versions,
         "recipe_versions": recipe_versions,
@@ -95,4 +101,5 @@ def load_frames_from_csv(directory: str, restaurant_id: str = "demo") -> dict:
         "purchases": pd.read_csv(d / "purchases.csv"),
         "counts": pd.read_csv(d / "inventory_counts.csv"),
         "events": events,
+        "menu": pd.read_csv(d / "menu.csv").rename(columns={"item_id": "menu_item_id"}),
     }
