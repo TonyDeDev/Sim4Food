@@ -616,7 +616,10 @@ form.stack {
   flex-direction: column;
   gap: 18px;
   max-width: 420px;
-  margin: 16px 0 20px;
+  /* Capped narrow on purpose (one field per row reads better than stretching
+     a dropdown or slider across a wide screen) - centered so that cap doesn't
+     leave it stranded against the left edge once .main is wider than 420px. */
+  margin: 16px auto 20px;
 }
 .whatif-slider label {
   display: block;
@@ -771,7 +774,12 @@ form.stack {
 
 /* ================= Simulation replay (retro canvas animation) ============= */
 .simview {
-  margin: 0 0 24px;
+  /* The canvas buffer is only 320x180 pixel-art; left to stretch to whatever
+     width .main happens to be, it balloons on a large monitor and the retro
+     sprites read as oversized. Capped at a small-arcade-window size and
+     centered so it doesn't also end up stranded against the left edge. */
+  max-width: 640px;
+  margin: 0 auto 24px;
   padding: 18px 18px 14px;
   border: 1px solid var(--hairline);
   border-radius: 14px;
