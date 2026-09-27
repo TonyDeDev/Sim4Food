@@ -185,3 +185,24 @@ For the pitch and for the remaining build time, give each part one job.
 
 Be honest in the pitch: on 12 weeks of data XGBoost ties the same-weekday baseline (WAPE 0.056 vs 0.057) and clearly beats "last week" (0.071).
 Its value today is a leak-free pipeline that gets better as history grows.
+
+## Status on branch snowflake-llm-gen
+
+| # | Status | What was done |
+|---|---|---|
+| X1 | Documented | The ingredient-week model is marked experimental in [xgboost-forecasting.md](xgboost-forecasting.md); left in place for its tests. |
+| X2 | Fixed | Early stopping picks the tree count, then the model is refit on train + validation. |
+| X3 | Fixed | `week_of_year` and `month` are only used with 52+ weeks (ablation on the demo: adding them raised WAPE from 0.067 to 0.078). |
+| X4 | Fixed | Events upload added; event days kept out of the baseline; explicit, shrunk lift from past events or the owner's estimate; event features only with 30+ event rows, with monotone constraints. |
+| X5 | Fixed | Target week is the week after today, forecast recursively up to 6 weeks; stale data is flagged. |
+| X6 | Fixed | Zero-sale days of a normally selling dish are censored; the baseline falls back to level x weekday index. Partial-day stockouts are still not detected. |
+| X7 | Fixed | Monte Carlo bands from week effect + dish noise, calibrated out of sample: coverage 0.85 vs 0.65, better interval score. UI label is now "Range hit rate". |
+| X8 | Fixed | The UI shows P50 with the likely range; orders use the service-level quantile. |
+| X9 | Fixed | `sim/recommend.py`: newsvendor per delivery day, adaptive top-up, pack rounding, projected stock, habit comparison and order backtest. |
+| X10 | Partly fixed | Pre-launch days are unknown instead of 0. The dish list still comes from sales, so a dish with no sales yet gets no forecast. |
+| X11 | Fixed | No recipes or under one full week return a message instead of a 500. |
+| X12 | Fixed | Rolling backtest capped to the last 12 origins; a full run takes about 3.5 s on the demo data from Neon. |
+| X13 | Documented | The CLI says the saved model is for inspection only. |
+
+Also found while fixing: the XGBoost model alone lost to the weekday baseline once stockout days were scored fairly (0.067 vs 0.061).
+The shipped forecast is therefore a 50/50 blend (0.058), with a champion check that falls back to the baseline when it does better.

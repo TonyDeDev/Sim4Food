@@ -145,3 +145,19 @@ Priority legend:
 5. A minimal vectorized swarm for What-If, calibrated so its normal week matches the XGBoost forecast, with deal price sensitivity and holiday multipliers on top (P0-1, P0-2, P0-9).
    Then the animation, which only replays that output.
 6. Remaining P1 bugs, then P2 polish.
+
+## Status on branch snowflake-llm-gen
+
+| # | Status | Notes |
+|---|---|---|
+| P0-3 | Fixed | Order recommendations, savings and a backtest replay are on the Forecast tab (see [xgboost-forecasting.md](xgboost-forecasting.md)). `/api/backtest` itself is still the simulation team's stub. |
+| P0-6 | Fixed | Events upload ("Deals and holidays" card); the Home "Next event" tile now fills. A Planner form is still to do. |
+| P0-10 | Fixed | The forecast targets the week after today. |
+| P1-6 | Fixed | No recipes or under one full week return a message. |
+| P1-10 | Fixed | ESLint ignores `backend/.venv`. |
+| P1-11 | Fixed | `handleUpdateBusiness` is a stable callback and listed as a dependency. |
+| P1-12 | Fixed | Documented lint exception: the root App Router layout loads the fonts for every page. |
+| P2 | Partly fixed | "Forecast confidence" is now "Range hit rate"; the Home tile no longer points to a missing Planner; tab buttons lost their browser-default borders; the sidebar email truncates. |
+| New | Added | Snowflake Cortex order summary and chat, see [snowflake-cortex.md](snowflake-cortex.md). |
+
+Not touched here (owned by the simulation work or out of this branch's scope): P0-1, P0-2, P0-4, P0-5, P0-7, P0-8, P0-9 and the other P1 items.
