@@ -1,62 +1,18 @@
-# SwarmStock
+Inspiration
+Food waste is a huge problem in Fredericton, New Brunswick. With restaurant owners having an 83% chance to shutdown within the first year, anything that could help them save on costs would allow for an advantage in today's cutthroat market.
 
-Helps independent restaurants cut food waste: upload your sales and invoices, see what you're wasting, and get a next-week order recommendation per ingredient. See `CLAUDE.md` for the full pitch, data model, and API contract.
+What it does
+Our web application creates a tool for business owners to cut down on food waste costs with the help of advanced prediction technology that integrates the use of Agent Based Modeling and XGBoost with Monte Carlo. Our smart simulation will create customers with their own generated personalities that will interact with the chosen restaurant. Users will be able to see how a variety of different events will affect inventory, the foods bought, and a person's willingness to eat at the establishment. This will allow a restaurant's owner to analyze results and adjust operations to optimize performance.
 
-## Stack
+How we built it
+Challenges we ran into
+We knew we wanted to implement Agent-Based Modeling into our project to simulate and predict customer behavior, but we were initially unsure which scenarios would be most effective. We wanted to create scenarios that could work alongside our XGBoost model without artificially or inaccurately altering the underlying data.
 
-- **Frontend:** Next.js (App Router) + React, plain CSS design system (no Tailwind despite what older docs may say) - `src/`
-- **Backend:** Python/FastAPI, XGBoost forecasting, Postgres via `asyncpg` - `backend/`
-- **Database:** one shared Neon Postgres instance for the whole team (not local Postgres, no Docker needed)
+Accomplishments that we're proud of
+*Creating an operable project within 24 hours that would realistically be able to be used by the average business owner *Being able to network with fellow programmers *Learning new types of coding styles *Attending our first Hackathon
 
-## Prerequisites
+What we learned
+*Usage of Agent Based Modeling and XGBoost Modeling with Monte Carlo to create realistic simulations of people interacting in specified scenarios *Operating efficiently under pressure while being provided a time limited space to work within *The use of Snowflake to develop an AI chatbot that users would be able to interact with on a technical level *The use of Claude AI as a development tool
 
-- **Node.js 20+** (a recent LTS). This project pins Next.js 16, which is unusually new - an older Node can fail to run it.
-- **Python 3.11+**
-- **Git**
-
-No Docker, no native build toolchain (no Visual Studio Build Tools / `node-gyp`) - password hashing uses Node's built-in `crypto`, and the Python dependencies all ship prebuilt wheels.
-
-## First-time setup
-
-1. Clone the repo.
-2. **Frontend deps:** `npm install` in the repo root.
-3. **Backend deps** (from the repo root):
-   ```
-   python -m venv .venv
-   .venv\Scripts\activate
-   pip install -r backend\requirements.txt -r backend\requirements-dev.txt
-   ```
-4. **Environment files** - copy `.env.example` → `.env` (repo root) and `backend/.env.example` → `backend/.env`. Both need the same Neon `POSTGRES_URL`. **This is a real secret and is gitignored** - ask a teammate for it, do not commit it.
-5. Everyone points at the same shared Neon database, so no schema setup is needed on your end - it already exists. If you and a teammate are both testing at once, you'll see each other's test data (same shared DB).
-
-## Running it (two terminals, both from the repo root)
-
-**Frontend:**
-```
-npm run dev
-```
-Opens on `http://localhost:3000`.
-
-**Backend** (from `backend/`, venv activated):
-```
-cd backend
-$env:PYTHONPATH = "."   # PowerShell; use `export PYTHONPATH=.` on macOS/Linux
-python -m uvicorn app.main:app --reload --port 8000
-```
-Serves on `http://localhost:8000`.
-
-Leave both terminals open while developing - closing either one kills that server, and `net::ERR_CONNECTION_REFUSED` in the browser almost always means the backend terminal got closed.
-
-`--reload` needs `PYTHONPATH=.` set on Windows, or its auto-restart subprocess fails with `ModuleNotFoundError: No module named 'app'` (a Windows + `multiprocessing` spawn quirk). It also runs as two OS processes (a supervisor and a worker) - stop it with Ctrl+C in its terminal, not by force-killing one PID, or the other can be left holding the port.
-
-## Tests
-
-```
-cd backend
-python -m pytest
-```
-
-## Learn More (Next.js defaults)
-
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Learn Next.js](https://nextjs.org/learn)
+What's next for Sim4Food
+We at Sim4Food have not ruled out the possibility of turning this project into a startup to help local Fredericton businesses. Many of the cafes and restaurants have been here for such a long time and we would like to help them remain open for years to come.
