@@ -1,6 +1,6 @@
 import { formatDay, formatMoney } from '../utils/format.js'
 
-// Replays past weeks: what our orders would have wasted and missed vs what was actually bought.
+// Replays past weeks: perishable leftovers and lost profit with our orders vs what was actually bought.
 export default function OrderBacktest({ backtest }) {
   if (!backtest) return null
   const { ours, actual } = backtest
@@ -10,6 +10,7 @@ export default function OrderBacktest({ backtest }) {
         <h2>How our orders would have done</h2>
         <p className="hint">
           Last {backtest.weeks} weeks, replayed on your real sales and stock counts, against what you actually bought.
+          Leftovers are perishable stock still on the shelf at the end of the week; lost profit is from running out.
         </p>
       </div>
       <div className="inventory-table-wrap">
@@ -17,10 +18,10 @@ export default function OrderBacktest({ backtest }) {
           <thead>
             <tr>
               <th>Week of</th>
-              <th>Your waste</th>
-              <th>Our waste</th>
-              <th>Your missed sales</th>
-              <th>Our missed sales</th>
+              <th>Your leftovers</th>
+              <th>Our leftovers</th>
+              <th>Your lost profit</th>
+              <th>Our lost profit</th>
             </tr>
           </thead>
           <tbody>

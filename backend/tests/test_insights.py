@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 
 from app import insights
 from app.auth import get_current_user_id
-from app.cortex import CortexClient, CortexError, clean
+from app.cortex import EM_DASH, EN_DASH, CortexClient, CortexError, clean
 from app.main import app
 
 RUN = {
@@ -49,7 +49,7 @@ def test_request_shape_and_account_url():
         seen["url"] = str(request.url)
         seen["auth"] = request.headers["Authorization"]
         seen["body"] = json.loads(request.content)
-        return httpx.Response(200, json={"choices": [{"message": {"content": "Order 85 kg — fine."}}]})
+        return httpx.Response(200, json={"choices": [{"message": {"content": f"Order 85 kg {EM_DASH} fine."}}]})
 
     text = asyncio.run(mock_client(handler).complete([{"role": "user", "content": "hi"}]))
     assert seen["url"] == "https://guvzzec-ss98777.snowflakecomputing.com/api/v2/cortex/v1/chat/completions"
@@ -90,7 +90,8 @@ def test_context_holds_only_the_run_numbers():
     assert ctx["restaurant"] == "Millbrook Cafe" and ctx["target_week_start"] == "2026-09-28"
     assert chicken["last_week_usage"] == 66.1 and chicken["order"]["deliveries"][1] == {"day": "Thursday", "qty": 50.0}
     assert ctx["accuracy"]["range_hit_rate"] == 0.85
-    assert ctx["savings"]["order_backtest"]["waste_reduction_pct"] == 10.0
+    assert ctx["savings"]["order_backtest"]["leftover_reduction_pct"] == 10.0
+    assert chicken["expected_leftover_cost"] == 40.0 and "waste" not in json.dumps(ctx)
 
 
 def test_chat_history_is_trimmed_and_must_end_with_the_owner():
@@ -155,4 +156,20 @@ def test_chat_surfaces_cortex_errors(api, monkeypatch):
 
 
 def test_clean_replaces_dashes():
-    assert clean("a—b–c") == "a - b-c"
+    assert clean(f"a{EM_DASH}b{EN_DASH}c") == "a - b-c"
+
+
+def test_overview_styles_use_their_own_prompt_and_cache(api, monkeypatch):
+    prompts = []
+
+    def handler(request):
+        prompts.append(json.loads(request.content)["messages"][-1]["content"])
+        return httpx.Response(200, json={"choices": [{"message": {"content": "- Order 85 kg of chicken."}}]})
+
+    monkeypatch.setattr(insights, "CortexClient", lambda: mock_client(handler))
+    short = api.post("/api/insights/summary", params={"restaurant_id": "r1", "style": "summary"}).json()
+    long = api.post("/api/insights/summary", params={"restaurant_id": "r1", "style": "detailed"}).json()
+    again = api.post("/api/insights/summary", params={"restaurant_id": "r1", "style": "summary"}).json()
+    assert short["style"] == "summary" and long["style"] == "detailed" and again["cached"]
+    assert len(prompts) == 2 and "bullet points" in prompts[0] and "2 short paragraphs" in prompts[1]
+    assert api.post("/api/insights/summary", params={"restaurant_id": "r1", "style": "essay"}).status_code == 422

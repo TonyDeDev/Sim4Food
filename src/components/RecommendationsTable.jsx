@@ -47,7 +47,7 @@ export default function RecommendationsTable({ ingredients }) {
             <th>Order</th>
             <th>vs usual</th>
             <th>Run-out risk</th>
-            <th>Exp. waste</th>
+            <th>Leftover risk</th>
           </tr>
         </thead>
         <tbody>

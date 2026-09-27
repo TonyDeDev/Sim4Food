@@ -90,9 +90,9 @@ export default function ForecastChat({ restaurantId, runAt }) {
           </div>
         ) : (
           messages.map((m, i) => (
-            <p key={i} className={`chat-bubble ${m.role}`}>
+            <div key={i} className={`chat-bubble ${m.role}`}>
               {m.content ? <PlainAnswer text={m.content} /> : (busy && i === messages.length - 1 ? <span className="typing" aria-label="Thinking" /> : null)}
-            </p>
+            </div>
           ))
         )}
       </div>

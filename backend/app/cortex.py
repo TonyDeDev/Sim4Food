@@ -15,6 +15,7 @@ import httpx
 from app.config import settings
 
 PATH = "/api/v2/cortex/v1/chat/completions"
+EM_DASH, EN_DASH = chr(0x2014), chr(0x2013)
 
 
 class CortexError(Exception):
@@ -26,7 +27,7 @@ class CortexError(Exception):
 
 def clean(text: str) -> str:
     """House style: plain hyphens, never em dashes."""
-    return text.replace("—", " - ").replace("–", "-")
+    return text.replace(EM_DASH, " - ").replace(EN_DASH, "-")
 
 
 def _explain(status: int, body: str) -> str:

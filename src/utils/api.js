@@ -74,8 +74,9 @@ export async function fetchInsightsStatus() {
   return response.json()
 }
 
-export async function fetchForecastSummary(restaurantId, { refresh = false, signal } = {}) {
-  const params = new URLSearchParams({ restaurant_id: restaurantId, refresh: String(refresh) })
+// style: 'summary' (a few bullets) or 'detailed' (two paragraphs).
+export async function fetchForecastSummary(restaurantId, { style = 'summary', signal } = {}) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId, style })
   const response = await fetch(`${API_URL}/api/insights/summary?${params}`, { method: 'POST', credentials: 'include', signal })
   if (!response.ok) throw new Error(await errorDetail(response, 'Could not write the summary'))
   return response.json()

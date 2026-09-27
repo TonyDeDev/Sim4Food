@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
+import AiOverview from './AiOverview.jsx'
 import { fetchInsightsStatus, fetchLatestForecast, runForecast } from '../utils/api.js'
 import { formatDateTime, formatDay, formatMoney, formatPct, formatWeekRange } from '../utils/format.js'
 import ForecastChat from './ForecastChat.jsx'
-import ForecastSummary from './ForecastSummary.jsx'
 import OrderBacktest from './OrderBacktest.jsx'
 import RecommendationsTable from './RecommendationsTable.jsx'
 import StatCard from './StatCard.jsx'
@@ -90,7 +90,7 @@ function ForecastResults({ forecast, restaurantId, runAt, assistant }) {
   const methods = accuracy?.methods
   const coverage = accuracy?.band_coverage
   const backtest = savings.order_backtest
-  const wasteChange = backtest?.waste_reduction_pct
+  const leftoverChange = backtest?.waste_reduction_pct
 
   return (
     <>
@@ -101,18 +101,18 @@ function ForecastResults({ forecast, restaurantId, runAt, assistant }) {
           sub={`based on sales through ${formatDay(data.based_on_sales_through)}`}
         />
         <StatCard
-          label="Waste vs what you bought"
-          value={wasteChange != null ? `${wasteChange > 0 ? '-' : '+'}${Math.abs(wasteChange)}%` : '-'}
-          tone={wasteChange > 0 ? 'good' : undefined}
+          label="Perishable leftovers vs your orders"
+          value={leftoverChange != null ? `${leftoverChange > 0 ? '-' : '+'}${Math.round(Math.abs(leftoverChange))}%` : '-'}
+          tone={leftoverChange > 0 ? 'good' : leftoverChange < 0 ? 'warn' : undefined}
           sub={backtest
-            ? `${formatMoney(backtest.actual.waste_cost - backtest.ours.waste_cost)} less over the last ${backtest.weeks} weeks`
+            ? `last ${backtest.weeks} weeks replayed: ${formatMoney(backtest.total_savings)} net after lost profit`
             : 'needs stock counts and purchases'}
         />
         <StatCard
           label="Forecast error"
           value={methods ? formatPct(methods.xgboost.wape, 1) : '-'}
           sub={methods
-            ? `same-weekday average ${formatPct(methods.dish_baseline.wape, 1)}, last week ${formatPct(methods.naive_last_week.wape, 1)}`
+            ? `lower is better: same-weekday average ${formatPct(methods.dish_baseline.wape, 1)}, repeating last week ${formatPct(methods.naive_last_week.wape, 1)}`
             : 'not enough history yet to check'}
         />
         <StatCard
@@ -153,7 +153,7 @@ function ForecastResults({ forecast, restaurantId, runAt, assistant }) {
 
       {assistant?.configured ? (
         <div className="ai-grid">
-          <ForecastSummary restaurantId={restaurantId} runAt={runAt} model={assistant.model} />
+          <AiOverview restaurantId={restaurantId} runAt={runAt} model={assistant.model} />
           <ForecastChat restaurantId={restaurantId} runAt={runAt} />
         </div>
       ) : assistant && (

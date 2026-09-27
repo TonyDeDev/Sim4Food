@@ -96,7 +96,7 @@ export default function IntroPage({ onLogin, onSignup }) {
           <div className="preview-section-copy" data-reveal>
             <p className="eyebrow">A CLEARER PICTURE</p>
             <h2>See what your<br />kitchen is telling you.</h2>
-            <p>Sim4Food is designed to bring inventory, recipes, and sales into one view—so useful patterns are easier to spot.</p>
+            <p>Sim4Food is designed to bring inventory, recipes, and sales into one view, so useful patterns are easier to spot.</p>
           </div>
           <div className="preview-frame" data-reveal><DashboardPreview /></div>
         </section>
