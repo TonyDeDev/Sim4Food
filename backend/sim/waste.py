@@ -105,16 +105,19 @@ async def compute_waste(restaurant_id: str) -> dict:
         if restaurant_uuid is None:
             return {"by_ingredient": []}
 
+        # Every fetch is explicitly ordered. Weekly totals are accumulated as
+        # floats, and float addition is not associative, so an unordered fetch
+        # let physical row order shift a total by a cent between runs.
         ingredients = await conn.fetch(
-            "SELECT id, external_id, name, unit_cost FROM ingredients WHERE restaurant_id = $1",
+            "SELECT id, external_id, name, unit_cost FROM ingredients WHERE restaurant_id = $1 ORDER BY external_id",
             restaurant_uuid,
         )
         purchases = await conn.fetch(
-            "SELECT ingredient_id, date, qty FROM purchases WHERE restaurant_id = $1",
+            "SELECT ingredient_id, date, qty FROM purchases WHERE restaurant_id = $1 ORDER BY date, ingredient_id",
             restaurant_uuid,
         )
         counts = await conn.fetch(
-            "SELECT ingredient_id, date, qty_on_hand FROM inventory_counts WHERE restaurant_id = $1",
+            "SELECT ingredient_id, date, qty_on_hand FROM inventory_counts WHERE restaurant_id = $1 ORDER BY date, ingredient_id",
             restaurant_uuid,
         )
         consumption = await conn.fetch(
@@ -123,6 +126,7 @@ async def compute_waste(restaurant_id: str) -> dict:
             FROM sales s
             JOIN recipes r ON r.menu_item_id = s.menu_item_id
             WHERE s.restaurant_id = $1
+            ORDER BY s.date, r.ingredient_id
             """,
             restaurant_uuid,
         )

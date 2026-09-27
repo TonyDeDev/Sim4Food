@@ -12,12 +12,6 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
-    // Parked Vite SPA from frontend-design, pending port to App Router.
-    "src/*.jsx",
-    "src/components/**/*.jsx",
-    "src/screens/**/*.jsx",
-    "src/utils/**/*.js",
-    "vite.config.js",
   ]),
 ]);
 

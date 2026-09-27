@@ -40,7 +40,7 @@ export default function BusinessDetailsPanel({ business, onClose, onSave }) {
             <span>Business type</span>
             <input required value={type} onChange={(event) => setType(event.target.value)} placeholder="e.g. Cafe, bakery, restaurant" />
           </label>
-          <div className="details-panel-note"><span className="details-note-mark">✳</span><span>For inventory, recipes, and POS files, use <strong>Edit records</strong> in the main panel.</span></div>
+          <div className="details-panel-note"><span className="details-note-mark">✳</span><span>Upload inventory, recipes, and POS files from the record cards on the main panel.</span></div>
           <div className="details-actions">
             <button className="btn-outline-modal" type="button" onClick={onClose}>Cancel</button>
             <button className="btn-submit-modal" type="submit" disabled={!name.trim() || !type.trim()}>Save details</button>

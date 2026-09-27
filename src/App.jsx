@@ -1,3 +1,5 @@
+"use client";
+
 import { useState } from 'react'
 import Login from './screens/Login.jsx'
 import Signup from './screens/Signup.jsx'
@@ -5,7 +7,6 @@ import Otp from './screens/Otp.jsx'
 import Dashboard from './screens/Dashboard.jsx'
 import IntroPage from './screens/IntroPage.jsx'
 import { nameFromEmail } from './utils/helpers.js'
-import './App.css'
 
 // 'landing' | 'login' | 'signup' | 'otp' | 'dashboard'
 export default function App() {
@@ -48,6 +49,15 @@ export default function App() {
     setBusinesses((prev) => prev.map((business) => business.id === id ? { ...business, ...updates } : business))
   }
 
+  // Merges against the latest state rather than a captured snapshot: uploads
+  // run concurrently and finish out of order, so a caller-built files map can
+  // be stale by the time the slowest one lands and would clobber the others.
+  function handleUploadRecord(id, key, filename) {
+    setBusinesses((prev) => prev.map((business) => business.id === id
+      ? { ...business, files: { ...business.files, [key]: filename } }
+      : business))
+  }
+
   if (screen === 'landing') {
     return <IntroPage onLogin={() => setScreen('login')} onSignup={() => setScreen('signup')} />
   }
@@ -64,5 +74,5 @@ export default function App() {
     return <Otp email={pendingSignup.email} onVerified={handleVerified} />
   }
 
-  return <Dashboard user={user} businesses={businesses} onAddBusiness={handleAddBusiness} onUpdateBusiness={handleUpdateBusiness} onSignOut={handleSignOut} />
+  return <Dashboard user={user} businesses={businesses} onAddBusiness={handleAddBusiness} onUpdateBusiness={handleUpdateBusiness} onUploadRecord={handleUploadRecord} onSignOut={handleSignOut} />
 }

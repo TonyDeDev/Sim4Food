@@ -1,5 +1,4 @@
 import { useEffect } from 'react'
-import '../Intro.css'
 
 function Mark({ className = '' }) {
   return (
