@@ -308,7 +308,9 @@ form.stack {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
+.user-info > div:last-child { min-width: 0; }
 .user-name {
   font-size: 16px;
   font-weight: 500;
@@ -319,6 +321,9 @@ form.stack {
   font-size: 13px;
   color: var(--ink-soft);
   margin: 2px 0 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sidebar.collapsed .user-name,
 .sidebar.collapsed .user-email,
@@ -628,6 +633,7 @@ form.stack {
 .record-tab {
   padding: 10px 4px;
   margin-bottom: -1px;
+  border: 0;
   border-bottom: 2px solid transparent;
   font-size: 14px;
   font-weight: 500;
@@ -778,6 +784,129 @@ form.stack {
 .inventory-table-wrap:last-child { margin-bottom: 0; }
 
 .sparkline { display: block; }
+
+/* Forecast tab: section headings, order table, backtest, AI assistant. */
+.section-head { margin: 28px 0 12px; }
+.section-head h2 { margin: 0 0 4px; font-size: 18px; font-weight: 500; color: var(--deep-green); }
+.section-head .hint { margin: 0; }
+
+.recommendations-table td { vertical-align: top; }
+.ingredient-name { display: block; font-weight: 500; }
+.range-main, .order-total { display: block; font-weight: 600; }
+.range-sub { display: block; margin-top: 2px; font-size: 12px; color: var(--ink-faint); white-space: nowrap; }
+.muted { color: var(--ink-faint); }
+.diff-up { color: var(--amber); font-weight: 600; white-space: nowrap; }
+.diff-down { color: var(--deep-green); font-weight: 600; white-space: nowrap; }
+.event-chip {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: #f7e6c4;
+  color: var(--amber);
+  font-size: 11px;
+  font-weight: 600;
+}
+.delivery-list { display: flex; flex-wrap: wrap; gap: 4px 10px; margin: 6px 0 0; padding: 0; list-style: none; font-size: 12px; }
+.delivery-list li { white-space: nowrap; color: var(--ink); }
+.delivery-list li.planned { color: var(--ink-faint); }
+.delivery-day { margin-right: 4px; font-weight: 600; }
+
+.event-line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.event-line .hint { margin: 0; }
+.event-name { font-weight: 500; color: var(--ink); }
+
+.backtest-section .inventory-table td.better { color: var(--deep-green); font-weight: 600; }
+.inventory-table tr.total-row td { font-weight: 600; border-top: 1px solid var(--hairline); }
+
+.ai-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 16px;
+  margin-bottom: 20px;
+}
+@media (max-width: 900px) {
+  .ai-grid { grid-template-columns: 1fr; }
+}
+.ai-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 20px;
+  border: 1px solid var(--hairline);
+  border-radius: 14px;
+  background: var(--cream);
+}
+.ai-card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.ai-card-head h2 { margin: 0; font-size: 16px; font-weight: 500; color: var(--deep-green); }
+.ai-card-head .btn-link { font-size: 13px; }
+.ai-card-head .btn-link:disabled { opacity: .5; cursor: default; }
+.ai-summary { margin: 0; font-size: 15px; line-height: 1.6; color: var(--ink); white-space: pre-wrap; }
+.ai-credit { margin: auto 0 0; font-size: 12px; color: var(--ink-faint); }
+.ai-skeleton { display: flex; flex-direction: column; gap: 8px; }
+.ai-skeleton .skeleton-line { height: 12px; }
+.ai-skeleton .skeleton-line.short { width: 60%; }
+.ai-off { margin: 0 0 20px; }
+
+.chat-log {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-height: 150px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.chat-suggestions { display: flex; flex-wrap: wrap; gap: 8px; }
+.chat-suggestion {
+  padding: 7px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--green-wash);
+  color: var(--deep-green);
+  font-size: 13px;
+  text-align: left;
+}
+.chat-suggestion:hover { background: var(--pastel-green); }
+.chat-suggestion:disabled { opacity: .5; cursor: default; }
+.chat-bubble {
+  max-width: 88%;
+  margin: 0;
+  padding: 9px 13px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.chat-bubble.user { align-self: flex-end; background: var(--pastel-green); color: var(--ink); border-bottom-right-radius: 4px; }
+.chat-bubble.assistant { align-self: flex-start; background: var(--cream-deep); color: var(--ink); border-bottom-left-radius: 4px; }
+.typing { display: inline-block; width: 28px; height: 10px; }
+.typing::after {
+  content: '';
+  display: block;
+  width: 6px;
+  height: 6px;
+  margin-top: 2px;
+  border-radius: 50%;
+  background: var(--ink-faint);
+  box-shadow: 10px 0 0 var(--ink-faint), 20px 0 0 var(--ink-faint);
+  animation: skeleton-pulse 1.2s ease-in-out infinite;
+}
+.chat-form { display: flex; gap: 8px; }
+.chat-form input {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 8px;
+  background: var(--cream);
+  font-size: 14px;
+  color: var(--ink);
+}
+.chat-form input:focus { outline: 2px solid var(--fresh-green); outline-offset: 1px; }
+.chat-form .btn-pastel { padding: 10px 18px; font-size: 14px; }
+.chat-form .btn-pastel:disabled { opacity: .55; cursor: default; }
 
 .biz-card {
   background: var(--pastel-green);

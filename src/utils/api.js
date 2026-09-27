@@ -10,6 +10,7 @@ export const RECORD_FIELDS = [
   { key: 'sales', label: 'POS / sales history' },
   { key: 'purchases', label: 'Purchases' },
   { key: 'inventory_counts', label: 'Inventory counts' },
+  { key: 'events', label: 'Deals and holidays' },
 ]
 
 // FastAPI lives on a different origin (:8000 vs :3000), so the session
@@ -58,6 +59,46 @@ export async function runForecast(restaurantId) {
   const response = await fetch(`${API_URL}/api/forecast?${params}`, { method: 'POST', credentials: 'include' })
   if (!response.ok) throw new Error(`Could not run the forecast (${response.status})`)
   return response.json()
+}
+
+// --- AI summary and chat (Snowflake Cortex), grounded in the latest stored forecast. ---
+
+async function errorDetail(response, fallback) {
+  const body = await response.json().catch(() => null)
+  return body?.detail || `${fallback} (${response.status})`
+}
+
+export async function fetchInsightsStatus() {
+  const response = await fetch(`${API_URL}/api/insights/status`, { credentials: 'include' })
+  if (!response.ok) throw new Error(await errorDetail(response, 'Could not reach the assistant'))
+  return response.json()
+}
+
+export async function fetchForecastSummary(restaurantId, { refresh = false, signal } = {}) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId, refresh: String(refresh) })
+  const response = await fetch(`${API_URL}/api/insights/summary?${params}`, { method: 'POST', credentials: 'include', signal })
+  if (!response.ok) throw new Error(await errorDetail(response, 'Could not write the summary'))
+  return response.json()
+}
+
+// Streams the assistant's answer: onDelta receives each text chunk as it arrives.
+export async function streamForecastChat(restaurantId, messages, onDelta, signal) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId })
+  const response = await fetch(`${API_URL}/api/insights/chat?${params}`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ messages }),
+    signal,
+  })
+  if (!response.ok) throw new Error(await errorDetail(response, 'The assistant could not answer'))
+  const reader = response.body.getReader()
+  const decoder = new TextDecoder()
+  for (;;) {
+    const { value, done } = await reader.read()
+    if (done) break
+    onDelta(decoder.decode(value, { stream: true }))
+  }
 }
 
 export async function uploadRecordFile(restaurantId, fileType, file) {

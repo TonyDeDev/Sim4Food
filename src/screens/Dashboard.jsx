@@ -39,7 +39,7 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
       })
       .catch(() => {})
     return () => { cancelled = true }
-  }, [selectedBusinessId])
+  }, [selectedBusinessId, onUpdateBusiness])
 
   function handleSelectBusiness(id) {
     setActiveId(id)

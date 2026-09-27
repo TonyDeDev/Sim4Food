@@ -179,7 +179,7 @@ export default function InventoryOverview({ restaurantId }) {
               value={home.next_event ? home.next_event.name : 'None planned'}
               sub={home.next_event
                 ? home.next_event.days_until === 0 ? 'starts today' : `in ${home.next_event.days_until} day${home.next_event.days_until === 1 ? '' : 's'}`
-                : 'add one in the Planner'}
+                : 'upload deals and holidays under Records'}
             />
           </>
         )}
