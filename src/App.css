@@ -769,7 +769,7 @@ form.stack {
   .whatif-stat-row { grid-template-columns: 1fr; }
 }
 
-/* ================= Simulation replay (canvas animation) ================= */
+/* ================= Simulation replay (retro canvas animation) ============= */
 .simview {
   margin: 0 0 24px;
   padding: 18px 18px 14px;
@@ -788,32 +788,13 @@ form.stack {
 .simview-canvas {
   display: block;
   width: 100%;
-  aspect-ratio: 960 / 400;
-  border-radius: 12px;
-  background: var(--cream);
-}
-.simview-stats {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 18px;
-  margin-top: 10px;
-  font-size: 13px;
-  color: var(--ink-soft);
-}
-.simview-stat { display: inline-flex; align-items: center; gap: 7px; }
-.simview-stat strong { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
-.simview-key { flex: none; width: 9px; height: 9px; border-radius: 50%; }
-.simview-key.is-served { background: var(--deep-green); }
-.simview-key.is-sub { background: transparent; border: 2px solid var(--amber); }
-.simview-key.is-lost { background: var(--error); }
-.simview-note {
-  margin-left: auto;
-  min-height: 18px;
-  font-size: 12px;
-  font-style: italic;
-  color: var(--amber);
-  text-align: right;
+  height: auto;
+  aspect-ratio: 16 / 9;
+  border: 2px solid var(--deep-green);
+  border-radius: 4px;
+  /* The buffer is 320x180 and the browser blows it up, so keep the pixels hard
+     edged instead of letting it smooth them into a blur. */
+  image-rendering: pixelated;
 }
 .simview-controls {
   display: flex;
@@ -822,7 +803,6 @@ form.stack {
   margin-top: 12px;
 }
 .simview-btn {
-  min-width: 82px;
   padding: 7px 16px;
   border: 1px solid var(--deep-green);
   border-radius: 6px;
@@ -830,6 +810,7 @@ form.stack {
   color: var(--ink);
   font-size: 13px;
   font-weight: 500;
+  white-space: nowrap;
 }
 .simview-btn:hover { background: var(--pastel-green-hover); }
 .simview-speeds {
@@ -867,7 +848,6 @@ form.stack {
 
 @media (max-width: 640px) {
   .simview { padding: 14px 12px 12px; }
-  .simview-note { width: 100%; margin-left: 0; text-align: left; }
   .simview-controls { flex-wrap: wrap; }
   .simview-progress { order: 3; flex-basis: 100%; }
 }

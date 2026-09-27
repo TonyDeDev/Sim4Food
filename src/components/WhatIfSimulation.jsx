@@ -1,17 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { API_URL } from '../utils/api'
+import { API_URL, fetchInsightsStatus } from '../utils/api'
+import AiOverview from './AiOverview.jsx'
 import SimView from './SimView.jsx'
 
 const money = (value) => `$${Number(value || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-const count = (value) => Math.round(Number(value || 0)).toLocaleString()
 const qty = (value) => Number(value || 0).toLocaleString(undefined, { maximumFractionDigits: 2 })
 const pct = (value) => (value == null ? '-' : `${(Number(value) * 100).toFixed(0)}%`)
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
-const arrivalLabel = (days) => (days || []).map((day) => DAY_NAMES[day] || `day ${day}`).join(' + ')
 
-export default function WhatIfSimulation({ restaurantId }) {
+export default function WhatIfSimulation({ restaurantId, restaurantName }) {
   const [dealPct, setDealPct] = useState(0)
   const [holiday, setHoliday] = useState(false)
   const [socialInfluence, setSocialInfluence] = useState(false)
@@ -26,9 +24,21 @@ export default function WhatIfSimulation({ restaurantId }) {
   const [result, setResult] = useState(null)
   // Bumped per completed run so the replay animation remounts and plays again.
   const [runSeq, setRunSeq] = useState(0)
+  // The week plays out before the numbers land, so the animation is watched
+  // rather than skipped past. A run without a replay reveals immediately.
+  const [revealed, setRevealed] = useState(false)
   const [error, setError] = useState('')
   const [configError, setConfigError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [assistant, setAssistant] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchInsightsStatus()
+      .then((data) => { if (!cancelled) setAssistant(data) })
+      .catch(() => { if (!cancelled) setAssistant({ configured: false }) })
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!restaurantId) return
@@ -71,6 +81,7 @@ export default function WhatIfSimulation({ restaurantId }) {
       const data = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(data.detail || 'Could not run the simulation')
       setMenu(data.menu || menu); setResult(data); setRunSeq((value) => value + 1)
+      setRevealed(!data.replay)
     } catch (e) { setError(e.message) } finally { setLoading(false) }
   }
 
@@ -78,21 +89,12 @@ export default function WhatIfSimulation({ restaurantId }) {
   const stockIngredient = ingredients.find((entry) => entry.id === stockIngredientId)
   const verdict = result?.plan_comparison
   const recommended = result?.plans?.recommended
-  const habit = result?.plans?.habit
   const planRows = recommended?.ingredients || []
-  // Ingredients needing an order come first, then whatever wastes most money.
-  const orderRows = [...planRows].sort((a, b) =>
-    (b.order_qty > 0) - (a.order_qty > 0) || b.waste_cost - a.waste_cost)
   const highestWaste = [...planRows].filter((row) => row.waste.p50 > 0)
     .sort((a, b) => b.waste_cost - a.waste_cost).slice(0, 3)
   const stockRisks = [...planRows].filter((row) => row.stockout_probability > 0)
     .sort((a, b) => b.stockout_probability - a.stockout_probability).slice(0, 5)
   const splitCount = planRows.filter((row) => (row.delivery_days || []).length > 1).length
-  const tradeoffRows = result ? [
-    ['Order nothing more', 0, result.scenario],
-    [`Your usual rule (${verdict.habit_multiplier}x usage)`, habit.order_cost, habit],
-    ['SwarmStock recommendation', recommended.order_cost, recommended],
-  ] : []
   const financeRows = result ? [
     ['Revenue', result.baseline.revenue.p50, result.scenario.revenue.p50],
     ['Ingredient cost', result.baseline.food_cost.p50, result.scenario.food_cost.p50],
@@ -142,7 +144,15 @@ export default function WhatIfSimulation({ restaurantId }) {
       <h2>What to do next week</h2>
       <p className="hint">{result.runs} simulated weeks. Your usual ordering rule and the recommendation face the identical weeks, so the only difference is what you buy and when it arrives.</p>
 
-      {result.replay && <SimView key={runSeq} replay={result.replay} runs={result.runs} />}
+      {result.replay && <SimView
+        key={runSeq}
+        replay={result.replay}
+        runs={result.runs}
+        restaurantName={restaurantName}
+        onFinish={() => setRevealed(true)}
+      />}
+
+      {revealed && <>
 
       <div className="whatif-stat-row">
         <div className="whatif-stat">
@@ -175,41 +185,16 @@ export default function WhatIfSimulation({ restaurantId }) {
         </div>
       </div>
 
+      {assistant?.configured ? (
+        <AiOverview kind="whatif" restaurantId={restaurantId} simulateResult={result} model={assistant.model} />
+      ) : assistant && (
+        <p className="hint ai-off">The AI assistant (Snowflake Cortex) is not set up on this server yet.</p>
+      )}
+
       {splitCount > 0 && <p className="whatif-decision">
         {splitCount} ingredient{splitCount === 1 ? '' : 's'} keep{splitCount === 1 ? 's' : ''} for less than a week, so a single weekly delivery is certain to spoil before it can be cooked.
         Splitting {splitCount === 1 ? 'it' : 'those'} into smaller drops buys the same weekly volume with less waste and fewer shortages.
       </p>}
-
-      <h3>Your order sheet</h3>
-      <p className="hint">Quantities already account for what is on your shelf, pack sizes, and shelf life.</p>
-      <div className="whatif-table-wrap"><table className="whatif-table"><thead><tr>
-        <th>Ingredient</th><th>Order</th><th>Arrives</th><th>Keeps</th><th>Expected to expire</th><th>Still usable after</th><th>Chance of running short</th>
-      </tr></thead><tbody>
-        {orderRows.map((row) => <tr key={row.ingredient_id}>
-          <td>{row.name}</td>
-          <td>{row.order_qty > 0 ? `${qty(row.order_qty)} ${row.unit}` : <span className="whatif-muted">nothing needed</span>}</td>
-          <td>{row.delivery_days?.length ? arrivalLabel(row.delivery_days) : <span className="whatif-muted">-</span>}</td>
-          <td>{row.shelf_life_days == null ? <span className="whatif-muted">long life</span> : `${row.shelf_life_days} days`}</td>
-          <td>{row.waste.p50 > 0 ? `${qty(row.waste.p50)} ${row.unit} · ${money(row.waste_cost)}` : <span className="whatif-muted">none</span>}</td>
-          <td>{qty(row.leftover_usable.p50)} {row.unit}</td>
-          <td className={row.stockout_probability >= 0.25 ? 'whatif-risk' : undefined}>{pct(row.stockout_probability)}</td>
-        </tr>)}
-      </tbody></table></div>
-
-      <h3>Over-ordering vs. under-ordering</h3>
-      <p className="hint">Buying too little shows up as lost sales, buying too much shows up as expired food. The recommendation is chosen to minimise the two together.</p>
-      <div className="whatif-table-wrap"><table className="whatif-table"><thead><tr>
-        <th>Plan</th><th>Cost to buy</th><th>Expired food</th><th>Lost sales</th><th>Demand served</th><th>Profit</th>
-      </tr></thead><tbody>
-        {tradeoffRows.map(([label, orderCost, plan]) => <tr key={label} className={plan === recommended ? 'is-recommended' : undefined}>
-          <td>{label}</td>
-          <td>{money(orderCost)}</td>
-          <td>{money(plan.waste_cost.p50)}</td>
-          <td>{money(plan.lost_sales_cost.p50)}</td>
-          <td>{count(plan.fulfilled_sales.p50)} of {count(plan.unconstrained_demand.p50)} dishes</td>
-          <td>{money(plan.profit.p50)}</td>
-        </tr>)}
-      </tbody></table></div>
 
       <div className="whatif-result-grid">
         <section className="whatif-result-panel"><h3>Where the waste is</h3>
@@ -233,6 +218,7 @@ export default function WhatIfSimulation({ restaurantId }) {
       <div className="whatif-table-wrap"><table className="whatif-table"><thead><tr><th>Measure</th><th>Baseline</th><th>What-if</th><th>Change</th></tr></thead><tbody>
         {financeRows.map(([label, baseline, scenario]) => <tr key={label}><td>{label}</td><td>{money(baseline)}</td><td>{money(scenario)}</td><td>{money(scenario - baseline)}</td></tr>)}
       </tbody></table></div>
+      </>}
     </section>}
   </>
 }

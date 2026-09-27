@@ -124,9 +124,13 @@ def api(monkeypatch, pages):
         pages.append(page)
         return ({"file_formats": {"files": []}} if page == "records" else insights.build_context(RUN)), "Millbrook Cafe"
 
+    async def name(restaurant_id):
+        return "Millbrook Cafe"
+
     monkeypatch.setattr(insights, "verify_restaurant_owner", owner)
     monkeypatch.setattr(insights, "_latest", latest)
     monkeypatch.setattr(insights, "_page_context", page_ctx)
+    monkeypatch.setattr(insights, "_restaurant_name", name)
     monkeypatch.setattr(insights, "chat_limiter", RateLimiter(limit=20, window_s=300))
     monkeypatch.setattr(insights, "overview_limiter", RateLimiter(limit=12, window_s=300))
     app.dependency_overrides[get_current_user_id] = lambda: "u1"
@@ -153,6 +157,43 @@ def test_summary_is_generated_then_cached(api, monkeypatch):
     second = api.post("/api/insights/summary", params={"restaurant_id": "r1"}).json()
     assert first["summary"] == "Order 85 kg of chicken." and not first["cached"] and second["cached"]
     assert len(calls) == 1 and "Chicken breast" in calls[0]["messages"][0]["content"]
+
+
+WHATIF_RESULT = {
+    "runs": 300,
+    "scenario_inputs": {"item_id": "d1", "discount_pct": 20, "holiday": True},
+    "scenario": {"revenue": {"p50": 900.0}},  # the shadowed MC-outcome; must never reach the prompt
+    "comparison": {"revenue_delta": 45.5, "profit_delta": 12.3, "waste_cost_delta": -4.2, "lost_sales_cost_delta": 1.1},
+    "plan_comparison": {"habit_multiplier": 1.25, "waste_cost_saving": 18.4, "purchase_cost_saving": 22.0,
+                        "profit_gain": 30.1, "service_level_recommended": 0.94, "service_level_habit": 0.81},
+    "plans": {"recommended": {"order_cost": 210.5, "waste_cost": {"p50": 12.0}, "profit": {"p50": 640.2},
+                              "ingredients": [{"name": "Chicken breast", "unit": "kg", "order_qty": 8.0,
+                                               "waste_cost": 15.2, "stockout_probability": 0.31}]}},
+    "replay": {"totals": {"orders": 195, "served_as_ordered": 152, "substituted": 30, "walked_out": 13}},
+    "menu": [{"id": "d1", "name": "Classic Burger", "price": 15.0}],
+}
+
+
+def test_whatif_summary_is_generated_then_cached(api, monkeypatch):
+    calls = []
+
+    def handler(request):
+        calls.append(json.loads(request.content))
+        return httpx.Response(200, json={"choices": [{"message": {"content": "- Order 8 kg of chicken."}}]})
+
+    monkeypatch.setattr(insights, "CortexClient", lambda: mock_client(handler))
+    first = api.post("/api/insights/whatif-summary", params={"restaurant_id": "r1"}, json=WHATIF_RESULT).json()
+    second = api.post("/api/insights/whatif-summary", params={"restaurant_id": "r1"}, json=WHATIF_RESULT).json()
+    assert first["summary"] == "- Order 8 kg of chicken." and not first["cached"] and second["cached"]
+    assert len(calls) == 1
+    prompt = calls[0]["messages"][0]["content"]
+    assert "Chicken breast" in prompt and "Classic Burger" in prompt
+    assert "900.0" not in prompt  # the shadowed scenario outcome never reaches the model
+
+
+def test_whatif_summary_rejects_a_payload_with_no_simulation_run(api):
+    r = api.post("/api/insights/whatif-summary", params={"restaurant_id": "r1"}, json={"menu": []})
+    assert r.status_code == 400 and "Run a simulation" in r.json()["detail"]
 
 
 def test_chat_streams_the_answer(api, monkeypatch):

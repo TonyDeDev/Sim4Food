@@ -151,7 +151,7 @@ function ForecastResults({ forecast, restaurantId, runAt, assistant }) {
       )}
 
       {assistant?.configured ? (
-        <AiOverview restaurantId={restaurantId} runAt={runAt} model={assistant.model} />
+        <AiOverview kind="forecast" restaurantId={restaurantId} runAt={runAt} model={assistant.model} />
       ) : assistant && (
         <p className="hint ai-off">The AI assistant (Snowflake Cortex) is not set up on this server yet.</p>
       )}

@@ -7,7 +7,33 @@ a recipes row's ingredient_id actually existing) are checked at persistence
 time against the database, not here, since this function only sees one
 file's rows at a time.
 """
+import csv
+import io
 from datetime import datetime
+
+
+def parse_csv_rows(raw: bytes) -> list[dict]:
+    """Decodes an uploaded file's raw bytes into CSV rows.
+
+    Tries UTF-8 first (with an optional BOM, which Excel's "CSV UTF-8" export
+    adds). Excel's plain "CSV (Comma delimited)" export on Windows writes
+    cp1252 instead, and a single curly quote, em dash, or accented letter
+    anywhere in the file - easy to pick up from autocorrect or a pasted dish
+    name - is then enough to make UTF-8 decoding raise, so cp1252 is tried
+    next. cp1252 itself is not total though: 0x81, 0x8D, 0x8F, 0x90 and 0x9D
+    are undefined in it and still raise, so latin-1 is the last resort -
+    unlike cp1252 it maps all 256 byte values, so it never raises. None of
+    this is a stricter check, so a genuinely unreadable upload (a spreadsheet
+    or image dropped in by mistake) still surfaces later as an ordinary
+    validation error - "missing required value(s)" or "file has no rows" -
+    instead of an unhandled decode crash.
+    """
+    for encoding in ("utf-8-sig", "cp1252"):
+        try:
+            return list(csv.DictReader(io.StringIO(raw.decode(encoding))))
+        except UnicodeDecodeError:
+            continue
+    return list(csv.DictReader(io.StringIO(raw.decode("latin-1"))))
 
 REQUIRED_COLUMNS = {
     "ingredients": ["ingredient_id", "name", "unit", "unit_cost", "pack_size"],

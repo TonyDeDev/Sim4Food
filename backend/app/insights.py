@@ -20,11 +20,12 @@ The forecast itself never depends on the LLM.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 from collections import OrderedDict
 from typing import Literal
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
@@ -112,9 +113,25 @@ uses real purchases.
 When you compare our order with the owner's usual one, quote both stockout_risk and \
 habit_stockout_risk; never assume they are equal. When you suggest changing a quantity, only state \
 its effect on risk if the context gives that number.""",
-    "whatif": """The owner is on the What If tab. Its simulation is not available yet (see \
-feature_status); do not pretend to run it or guess its results. Help with the upcoming events in \
-the context and explain how to get a deal or holiday into the forecast today.""",
+    "whatif": """The owner is on the What If tab: a deal slider, holiday and word-of-mouth toggles, a \
+manual stock override and a delivery-delay control, all played back as an animated week before a \
+Monte Carlo comparison against the owner's usual ordering habit.
+When the context has a scenario and recommended_vs_habit block, a result is showing and read it this way:
+- simulated_weeks is how many independent Monte Carlo weeks were run to build the comparison; more is steadier.
+- scenario is what was tested: the promoted item and discount, whether a holiday or word-of-mouth lift was \
+added, and any manual stock or delayed-delivery override.
+- recommended_vs_habit compares our ordering rule with the owner's usual one (last week's usage times a \
+multiplier) on the identical simulated demand: waste_cost_saving and purchase_cost_saving are dollars, \
+positive favours the recommendation; service_level_* is the share of demand actually served.
+- scenario_effect_holding_order_fixed isolates what the deal, holiday or word-of-mouth setting alone does to \
+revenue, waste and lost sales with ordering held constant, so it is never confused with an ordering change.
+- highest_waste_ingredients and highest_stockout_risk_ingredients are the few ingredients most worth \
+attention under the recommended plan.
+- sample_week_replay is one representative simulated week (served as ordered, given an alternative, or left \
+because stock ran out) - the same week the on-screen animation plays.
+When only upcoming_events is present, no simulation has been run this visit: help with those events and \
+point the owner to the deal slider, holiday toggle and "Run comparison" button on the What If tab. Never \
+guess at numbers that are not in the context.""",
 }
 
 _OVERVIEW_TOPICS = (
@@ -134,6 +151,26 @@ OVERVIEW_PROMPTS = {
         "Write the owner a detailed overview of this week's order in 2 short paragraphs (6 to 9 "
         "sentences in total), separated by a blank line. Cover " + _OVERVIEW_TOPICS + ", and say why "
         "each item needing attention matters and what to watch for. No title, no markdown or asterisks."
+    ),
+}
+
+_WHATIF_OVERVIEW_TOPICS = (
+    "what scenario was tested, whether the recommended order beats the owner's usual habit and by how much "
+    "(waste, purchase cost, profit, service level), what the deal, holiday or word-of-mouth setting alone does "
+    "to revenue and waste holding ordering fixed, and which ingredients most need attention (highest waste or "
+    "run-out risk)"
+)
+
+WHATIF_OVERVIEW_PROMPTS = {
+    "summary": (
+        "Give the owner a quick overview of this simulated scenario as 3 to 5 bullet points, each one line "
+        "starting with \"- \" and at most 20 words. Cover " + _WHATIF_OVERVIEW_TOPICS + ". "
+        "No title, no intro sentence, no markdown or asterisks."
+    ),
+    "detailed": (
+        "Write the owner a detailed overview of this simulated scenario in 2 short paragraphs (6 to 9 "
+        "sentences in total), separated by a blank line. Cover " + _WHATIF_OVERVIEW_TOPICS + ", and say why "
+        "each ingredient needing attention matters. No title, no markdown or asterisks."
     ),
 }
 
@@ -240,6 +277,50 @@ async def summary(
     while len(_summary_cache) > SUMMARY_CACHE_SIZE:
         _summary_cache.popitem(last=False)
     return {"run_at": run["run_at"], "style": style, "summary": text, "model": client.model, "cached": False}
+
+
+@router.post("/whatif-summary")
+async def whatif_summary(
+    restaurant_id: str,
+    body: dict = Body(...),
+    style: Literal["summary", "detailed"] = "summary",
+    refresh: bool = False,
+    user_id: str = Depends(get_current_user_id),
+):
+    """Overview of a just-run what-if simulation.
+
+    Unlike /summary, there is nothing stored server-side to read: a what-if
+    scenario is scoped to the browser tab, re-run on every slider change, with
+    no "latest run" concept worth persisting. The browser sends its own copy
+    of the /api/simulate response, and every field used from it is
+    re-derived and whitelisted by page_context.whatif_result_context before
+    it reaches the model - the body is data, never trusted as-is.
+    """
+    await verify_restaurant_owner(restaurant_id, user_id)
+    if not body.get("plan_comparison"):
+        raise HTTPException(status_code=400, detail="Run a simulation first, then ask for an overview.")
+    client = _client()
+    context = page_context.whatif_result_context(body)
+    name = await _restaurant_name(restaurant_id)
+    # No run_at to key the cache on, so the curated context stands in for it:
+    # the same scenario asked twice (toggling Summary/Detailed) hits cache.
+    digest = hashlib.sha256(json.dumps(context, sort_keys=True, default=str).encode()).hexdigest()
+    key = (restaurant_id, digest, style)
+    if not refresh and key in _summary_cache:
+        return {"style": style, "summary": _summary_cache[key], "model": client.model, "cached": True}
+    _check_rate(overview_limiter, user_id)
+    messages = [
+        system_message(context, "whatif", name),
+        {"role": "user", "content": WHATIF_OVERVIEW_PROMPTS[style]},
+    ]
+    try:
+        text = await client.complete(messages, max_tokens=700 if style == "detailed" else 350)
+    except CortexError as err:
+        raise HTTPException(status_code=502, detail=err.message) from err
+    _summary_cache[key] = text
+    while len(_summary_cache) > SUMMARY_CACHE_SIZE:
+        _summary_cache.popitem(last=False)
+    return {"style": style, "summary": text, "model": client.model, "cached": False}
 
 
 @router.post("/chat")

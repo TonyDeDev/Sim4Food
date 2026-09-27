@@ -79,6 +79,22 @@ export async function fetchForecastSummary(restaurantId, { style = 'summary', si
   return response.json()
 }
 
+// Overview of a just-run what-if simulation. There is no stored "latest run"
+// for this one (a scenario is scoped to the browser tab, re-run on every
+// slider change), so the browser sends its own copy of the /api/simulate
+// result; the server re-derives and whitelists every field before it reaches
+// the model (see page_context.whatif_result_context).
+export async function fetchWhatIfSummary(restaurantId, simulateResult, { style = 'summary', signal } = {}) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId, style })
+  const response = await fetch(`${API_URL}/api/insights/whatif-summary?${params}`, {
+    method: 'POST', credentials: 'include', signal,
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(simulateResult),
+  })
+  if (!response.ok) throw new Error(await errorDetail(response, 'Could not write the summary'))
+  return response.json()
+}
+
 // Streams the assistant's answer about one dashboard tab ('home', 'records',
 // 'forecast', 'whatif'): onDelta receives each text chunk as it arrives. Only the
 // tab name is sent; the server loads that tab's data itself.

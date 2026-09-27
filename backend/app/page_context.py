@@ -90,6 +90,93 @@ def forecast_context(run: dict) -> dict:
     }
 
 
+WHATIF_TOP_INGREDIENTS = 5
+
+
+def whatif_result_context(payload: dict) -> dict:
+    """Compact view of a just-run what-if simulation: only the numbers the What
+    If tab's headline stats and tables show, not the full per-run Monte Carlo
+    detail (hundreds of ingredient-quantile rows, the raw replay order log).
+
+    ``payload`` is the browser's own copy of the /api/simulate response, so
+    every field here is re-derived and whitelisted rather than forwarded -
+    nothing the browser sends reaches the model unchecked.
+    """
+    menu_by_id = {d.get("id"): d for d in payload.get("menu") or []}
+    scenario_inputs = payload.get("scenario_inputs") or {}
+    comparison = payload.get("comparison") or {}
+    plan_comparison = payload.get("plan_comparison") or {}
+    plans = payload.get("plans") or {}
+    recommended = plans.get("recommended") or {}
+    replay_totals = (payload.get("replay") or {}).get("totals") or {}
+
+    def dish_name(item_id):
+        dish = menu_by_id.get(item_id)
+        return safe_text(dish["name"]) if dish else None
+
+    def top(rows, key, limit):
+        return sorted(
+            (r for r in rows if (r.get(key) or 0) > 0), key=lambda r: r[key], reverse=True,
+        )[:limit]
+
+    recommended_rows = recommended.get("ingredients") or []
+    to_order = [r for r in recommended_rows if (r.get("order_qty") or 0) > 0]
+
+    return {
+        "simulated_weeks": payload.get("runs"),
+        "scenario": {
+            "promoted_item": dish_name(scenario_inputs.get("item_id")),
+            "discount_pct": _round(scenario_inputs.get("discount_pct"), 0),
+            "holiday": bool(scenario_inputs.get("holiday")),
+            "social_influence": bool(scenario_inputs.get("social_influence")),
+            "stock_override_count": len(scenario_inputs.get("stock_overrides") or {}),
+            "delivery_delay_days": scenario_inputs.get("delivery_delay_days")
+            if _number(scenario_inputs.get("delivery_qty")) else None,
+        },
+        "recommended_vs_habit": {
+            "habit_multiplier": plan_comparison.get("habit_multiplier"),
+            "waste_cost_saving": _round(plan_comparison.get("waste_cost_saving")),
+            "purchase_cost_saving": _round(plan_comparison.get("purchase_cost_saving")),
+            "profit_gain": _round(plan_comparison.get("profit_gain")),
+            "service_level_recommended": plan_comparison.get("service_level_recommended"),
+            "service_level_habit": plan_comparison.get("service_level_habit"),
+        },
+        "recommended_plan": {
+            "order_cost": _round(recommended.get("order_cost")),
+            "waste_cost": _round((recommended.get("waste_cost") or {}).get("p50")),
+            "profit": _round((recommended.get("profit") or {}).get("p50")),
+            "ingredients_to_order": len(to_order),
+        },
+        "scenario_effect_holding_order_fixed": {
+            "revenue_delta": _round(comparison.get("revenue_delta")),
+            "profit_delta": _round(comparison.get("profit_delta")),
+            "waste_cost_delta": _round(comparison.get("waste_cost_delta")),
+            "lost_sales_cost_delta": _round(comparison.get("lost_sales_cost_delta")),
+        },
+        "highest_waste_ingredients": [
+            {"name": safe_text(r["name"]), "unit": safe_text(r.get("unit"), 12), "waste_cost": _round(r.get("waste_cost"))}
+            for r in top(recommended_rows, "waste_cost", WHATIF_TOP_INGREDIENTS)
+        ],
+        "highest_stockout_risk_ingredients": [
+            {"name": safe_text(r["name"]), "unit": safe_text(r.get("unit"), 12), "stockout_probability": r.get("stockout_probability")}
+            for r in top(recommended_rows, "stockout_probability", WHATIF_TOP_INGREDIENTS)
+        ],
+        "sample_week_replay": {
+            "orders": replay_totals.get("orders"),
+            "served_as_ordered": replay_totals.get("served_as_ordered"),
+            "substituted": replay_totals.get("substituted"),
+            "walked_out": replay_totals.get("walked_out"),
+        } if replay_totals else None,
+    }
+
+
+def _number(value) -> float:
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def home_context(summary: dict, inventory_report: dict) -> dict:
     rows = []
     for r in inventory_report.get("ingredients") or []:
@@ -186,10 +273,12 @@ async def _whatif(restaurant_id: str) -> dict:
             restaurant_id,
         )
     return {
-        "feature_status": "The What If simulation (deal slider and holiday toggle) is still being built and cannot "
-        "run yet. The upcoming_events below are already uploaded, so the Forecast tab applies their lift when "
-        "their dates fall in the forecast week (re-run the forecast after any change). A new or changed deal "
-        "or holiday is added by uploading the full events list again under Records (Deals and holidays).",
+        "note": "No simulation has been run yet this visit: this context only has the events already uploaded. "
+        "Once the owner presses \"Run comparison\" on the What If tab, its Overview card summarises that result "
+        "(see the Overview card's own context for the fields it covers). The Forecast tab separately applies an "
+        "upcoming event's lift automatically when its dates fall in the forecast week (re-run the forecast after "
+        "any change). A new or changed deal or holiday is added by uploading the full events list again under "
+        "Records (Deals and holidays).",
         "upcoming_events": [
             {
                 "type": e["type"], "name": safe_text(e["name"]), "start_date": e["start_date"].isoformat(),

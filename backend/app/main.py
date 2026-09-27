@@ -1,6 +1,4 @@
 import asyncio
-import csv
-import io
 from datetime import date
 from contextlib import asynccontextmanager
 
@@ -47,7 +45,7 @@ async def post_upload(
     await verify_restaurant_owner(restaurant_id, user_id)
 
     raw = await file.read()
-    rows = list(csv.DictReader(io.StringIO(raw.decode("utf-8-sig"))))
+    rows = ingest.parse_csv_rows(raw)
 
     validation = ingest.validate_upload(file_type, rows)
     if validation["status"] != "ok":
@@ -193,6 +191,12 @@ async def post_simulate(restaurant_id: str, scenario: dict, user_id: str = Depen
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     result["menu"] = [{"id": d["id"], "name": d["name"], "price": d["price"]} for d in dish_specs]
+    # forecast_demand's own return dict has a "scenario" key too (the Monte
+    # Carlo outcome under the scenario conditions, dict-merged in last so it
+    # wins) - scenario_inputs is the one unambiguous place to find what was
+    # actually dialled in (item, discount, holiday, overrides), for callers
+    # like the What If overview that need the request rather than the result.
+    result["scenario_inputs"] = scenario or {}
     return result
 
 

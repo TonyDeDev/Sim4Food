@@ -139,7 +139,7 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
 
             {activeTab === 'forecast' && <ForecastOverview restaurantId={selectedBusiness.id} />}
 
-            {activeTab === 'whatif' && <WhatIfSimulation restaurantId={selectedBusiness.id} />}
+            {activeTab === 'whatif' && <WhatIfSimulation restaurantId={selectedBusiness.id} restaurantName={selectedBusiness.name} />}
           </>
         )}
       </main>
