@@ -45,8 +45,19 @@ CREATE TABLE ingredients (
     pack_size NUMERIC(10, 3) NOT NULL,
     shelf_life_days INT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-    UNIQUE (restaurant_id, external_id)
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    -- History lives in this table: a changed unit / unit_cost / pack_size /
+    -- shelf_life_days leaves the old values behind as a row with valid_to set
+    -- and current_id pointing at the current row. The first version starts at
+    -- 1900-01-01. Everything else references the current row's id.
+    valid_from TIMESTAMPTZ NOT NULL DEFAULT now(),
+    valid_to TIMESTAMPTZ,
+    current_id UUID REFERENCES ingredients(id) ON DELETE CASCADE,
+    CONSTRAINT ingredients_history_check
+        CHECK ((current_id IS NULL) = (valid_to IS NULL) AND (valid_to IS NULL OR valid_to >= valid_from))
 );
+CREATE UNIQUE INDEX ingredients_current_key ON ingredients (restaurant_id, external_id) WHERE current_id IS NULL;
+CREATE INDEX idx_ingredients_current_id ON ingredients (current_id) WHERE current_id IS NOT NULL;
 
 CREATE TABLE menu_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -56,6 +67,7 @@ CREATE TABLE menu_items (
     price NUMERIC(10, 2) NOT NULL,
     category TEXT,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (restaurant_id, external_id)
 );
 
@@ -64,8 +76,13 @@ CREATE TABLE recipes (
     menu_item_id UUID NOT NULL REFERENCES menu_items(id) ON DELETE CASCADE,
     ingredient_id UUID NOT NULL REFERENCES ingredients(id) ON DELETE CASCADE,
     qty_per_serving NUMERIC(10, 4) NOT NULL,
-    UNIQUE (menu_item_id, ingredient_id)
+    -- A changed quantity ends this row (valid_to) and adds a new one. valid_to
+    -- NULL is the current line. The first version starts at 1900-01-01.
+    valid_from TIMESTAMPTZ NOT NULL DEFAULT now(),
+    valid_to TIMESTAMPTZ,
+    CONSTRAINT recipes_history_check CHECK (valid_to IS NULL OR valid_to >= valid_from)
 );
+CREATE UNIQUE INDEX recipes_current_key ON recipes (menu_item_id, ingredient_id) WHERE valid_to IS NULL;
 
 CREATE TABLE upload_batches (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),

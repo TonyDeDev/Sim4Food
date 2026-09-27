@@ -5,6 +5,7 @@ Returns pandas frames keyed by string ids, ready for sim.features.build_feature_
 import pandas as pd
 
 from app.db import get_pool
+from sim import history
 
 
 async def load_frames(restaurant_id: str) -> dict:
@@ -19,17 +20,20 @@ async def load_frames(restaurant_id: str) -> dict:
             "FROM sales WHERE restaurant_id = $1 ORDER BY date, menu_item_id",
             restaurant_id,
         )
-        recipes = await conn.fetch(
+        # recipes and ingredients keep their own history: the current values are
+        # the rows with valid_to NULL, and *_versions carry every version.
+        recipe_rows = await conn.fetch(
             "SELECT r.menu_item_id::text AS menu_item_id, r.ingredient_id::text AS ingredient_id, "
-            "r.qty_per_serving::float8 AS qty_per_serving "
+            "r.qty_per_serving::float8 AS qty_per_serving, r.valid_from, r.valid_to "
             "FROM recipes r JOIN menu_items m ON m.id = r.menu_item_id "
-            "WHERE m.restaurant_id = $1 ORDER BY 1, 2",
+            "WHERE m.restaurant_id = $1 ORDER BY 1, 2, r.valid_from",
             restaurant_id,
         )
-        ingredients = await conn.fetch(
-            "SELECT id::text AS ingredient_id, name, unit, unit_cost::float8 AS unit_cost, "
-            "pack_size::float8 AS pack_size, shelf_life_days::float8 AS shelf_life_days "
-            "FROM ingredients WHERE restaurant_id = $1 ORDER BY external_id",
+        ingredient_rows = await conn.fetch(
+            "SELECT COALESCE(current_id, id)::text AS ingredient_id, external_id, name, unit, "
+            "unit_cost::float8 AS unit_cost, pack_size::float8 AS pack_size, "
+            "shelf_life_days::float8 AS shelf_life_days, valid_from, valid_to "
+            "FROM ingredients WHERE restaurant_id = $1 ORDER BY external_id, valid_from",
             restaurant_id,
         )
         purchases = await conn.fetch(
@@ -52,14 +56,25 @@ async def load_frames(restaurant_id: str) -> dict:
     def frame(rows, columns):
         return pd.DataFrame([dict(r) for r in rows], columns=columns)
 
+    recipe_versions = history.to_recipe_versions(recipe_rows)
+    ingredient_versions = history.to_ingredient_versions(ingredient_rows)
+    current_ingredients = [dict(r) for r in ingredient_rows if r["valid_to"] is None]
+
     return {
         "restaurant_id": str(restaurant_id),
         "sales": frame(sales, ["date", "menu_item_id", "qty_sold", "avg_price"]),
-        "recipes": frame(recipes, ["menu_item_id", "ingredient_id", "qty_per_serving"]),
-        "ingredients": frame(ingredients, ["ingredient_id", "name", "unit", "unit_cost", "pack_size", "shelf_life_days"]),
+        "recipes": recipe_versions[recipe_versions["valid_to"] == history.OPEN_END][
+            ["menu_item_id", "ingredient_id", "qty_per_serving"]
+        ].reset_index(drop=True),
+        "ingredients": pd.DataFrame(
+            current_ingredients, columns=["ingredient_id", "name", "unit", "unit_cost", "pack_size", "shelf_life_days"]
+        ),
         "purchases": frame(purchases, ["date", "ingredient_id", "qty"]),
         "counts": frame(counts, ["date", "ingredient_id", "qty_on_hand"]),
         "events": frame(events, ["type", "start_date", "end_date", "items", "discount_pct", "expected_lift"]),
+        # Every version of each row with its valid_from / valid_to, see sim.history.
+        "ingredient_versions": ingredient_versions,
+        "recipe_versions": recipe_versions,
     }
 
 

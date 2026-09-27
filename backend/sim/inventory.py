@@ -11,6 +11,7 @@ from collections import defaultdict
 from datetime import date
 
 from app.db import get_pool
+from sim.consumption import load_consumption
 
 
 def build_inventory_report(
@@ -63,26 +64,18 @@ async def compute_inventory(restaurant_id: str) -> dict:
     pool = get_pool()
     async with pool.acquire() as conn:
         ingredients = await conn.fetch(
-            "SELECT id, external_id, name, unit FROM ingredients WHERE restaurant_id = $1 ORDER BY external_id",
+            "SELECT id, external_id, name, unit FROM ingredients "
+            "WHERE restaurant_id = $1 AND current_id IS NULL ORDER BY external_id",
             restaurant_id,
         )
         stock = await conn.fetch(
             "SELECT ingredient_id, qty_on_hand FROM inventory_current WHERE restaurant_id = $1",
             restaurant_id,
         )
-        consumption = await conn.fetch(
-            """
-            SELECT r.ingredient_id, s.date, s.qty_sold * r.qty_per_serving AS qty
-            FROM sales s
-            JOIN recipes r ON r.menu_item_id = s.menu_item_id
-            WHERE s.restaurant_id = $1
-            ORDER BY s.date, r.ingredient_id
-            """,
-            restaurant_id,
-        )
+        consumption = await load_consumption(conn, restaurant_id, [dict(r) for r in ingredients])
 
     return build_inventory_report(
         [dict(r) for r in ingredients],
         [dict(r) for r in stock],
-        [dict(r) for r in consumption],
+        consumption,
     )

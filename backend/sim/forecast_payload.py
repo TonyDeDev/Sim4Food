@@ -25,6 +25,7 @@ from sim.forecast_backtest import (
     rolling_backtest,
     summarize,
 )
+from sim.history import recipe_versions_of
 from sim.train_dish_xgb import fit, forecast_next_week, to_ingredient_usage, usable_rows
 
 LEARNING_WEEKS = 8
@@ -74,7 +75,7 @@ def build_forecast_payload(frames: dict) -> dict:
         return {"data": {"weeks_of_history": 0, **data_status(0)}, "accuracy": None, "ingredients": []}
 
     frames = {**frames, "sales": _complete_weeks_only(sales)}
-    recipes = frames["recipes"]
+    recipes = recipe_versions_of(frames)
     matrix = build_dish_matrix(frames["restaurant_id"], frames["sales"], frames["events"])
     observed = matrix[matrix[QTY].notna()]
     weeks = sorted(observed["forecast_week"].unique())

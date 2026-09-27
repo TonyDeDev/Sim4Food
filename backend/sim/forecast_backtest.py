@@ -20,6 +20,7 @@ import pandas as pd
 
 from sim.dataset import load_frames, load_frames_from_csv
 from sim.dish_features import build_dish_matrix
+from sim.history import recipe_versions_of
 from sim.train_dish_xgb import (
     fit,
     forecast_next_week,
@@ -167,7 +168,7 @@ async def _load(args) -> dict:
 async def main(args) -> None:
     frames = await _load(args)
     matrix = build_dish_matrix(frames["restaurant_id"], frames["sales"], frames["events"])
-    bt = rolling_backtest(matrix, frames["recipes"])
+    bt = rolling_backtest(matrix, recipe_versions_of(frames))
     weeks = sorted(bt["forecast_week"].unique())
     print(f"origins: {len(weeks)} weeks ({weeks[0].date()} to {weeks[-1].date()}), {len(bt)} ingredient-weeks")
 

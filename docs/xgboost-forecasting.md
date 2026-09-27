@@ -88,7 +88,13 @@ Its target is NaN, and its features are built from history only.
 | `holiday_flag`, `deal_flag` | events | 1 when a holiday or deal overlaps week W. |
 | `ingredient_event_flag` | events, recipes | 1 when an event overlapping W lists a menu item whose recipe uses the ingredient. |
 | `event_expected_lift` | events | Largest `expected_lift` among events affecting the ingredient in W. Holidays without an item list apply to all ingredients. |
-| `unit_cost`, `pack_size`, `shelf_life_days` | ingredients | Static ingredient attributes. |
+| `unit_cost`, `pack_size`, `shelf_life_days` | ingredients (history rows) | Value in force at the Monday of W, from the change log. The next-week inference row uses the current value. |
+| `unit_cost_change_pct_4w` | ingredients (history rows) | `unit_cost` at the Monday of W divided by `unit_cost` 28 days earlier, minus 1. 0 when nothing changed. |
+| `days_since_price_change` | ingredients (history rows) | Days from the latest logged `unit_cost` change effective at or before the Monday of W. NaN when none. |
+| `price_changed_recent_flag` | ingredients (history rows) | 1 when `days_since_price_change` is 14 or less. |
+| `recipe_qty_per_dish_sum` | recipes (history rows) | Sum of `qty_per_serving` across the dishes using the ingredient, as in force at the Monday of W. |
+| `days_since_recipe_change` | recipes (history rows) | Days from the latest logged recipe change for the ingredient effective at or before the Monday of W. NaN when none. |
+| `recipe_change_flag_4w` | recipes (history rows) | 1 when `days_since_recipe_change` is 28 or less. |
 
 `inventory_variance_4w` is deliberately not called waste.
 It also contains count errors, unrecorded usage and transfers.
@@ -351,3 +357,18 @@ python -m venv .venv
 - When more history exists (26+ weeks), enable the deferred long lags and revisit hyperparameters.
 - Purchase recommendation should consume the predicted usage together with `inventory_current`, shelf life and pack size.
   Using `inventory_current` at recommendation time is correct, because that is the live state, unlike in historical training rows.
+
+## Row history and point-in-time lookups
+
+`ingredients` and `recipes` keep their own history, there is no separate log table (see `db/migrations/001_versioned_rows.sql`).
+Each row has `valid_from` and `valid_to`, and was in force for `valid_from <= t < valid_to`.
+The first version starts at 1900-01-01 so it covers all earlier history.
+
+- **recipes:** a changed quantity ends the current row (`valid_to` set) and adds a new row (`valid_from` = the change time). Removing an ingredient from a dish only ends its row. `valid_to IS NULL` is the current line.
+- **ingredients:** when `unit`, `unit_cost`, `pack_size` or `shelf_life_days` change, a copy of the old values is inserted with `valid_to` set and `current_id` pointing at the current row, and the current row is updated in place with the new `valid_from`. The current row (`current_id IS NULL`) keeps its id, so purchases, counts and recipes keep pointing at it. Always filter `current_id IS NULL` when you want the current ingredients.
+- **Uploads:** the change time is the upload time, or the optional `effective_date` column (YYYY-MM-DD) in the ingredients and recipes CSVs. An `effective_date` earlier than the row's last change is rejected. Identical re-uploads write nothing. A dish in a recipes upload is treated as fully specified, so ingredients missing from it are ended.
+
+`sim/history.py` turns these rows into "value in force at time T" lookups.
+Historical usage (the training target), waste quantity and waste dollars use the recipe and price in force at the time, so an edit never rewrites past weeks.
+The forecast for the upcoming week always uses the current values.
+Menu prices are not versioned because `sales.avg_price` already records the price at the time of each sale.
