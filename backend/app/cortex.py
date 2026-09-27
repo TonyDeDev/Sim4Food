@@ -56,8 +56,10 @@ class CortexClient:
         timeout_s: float | None = None,
         transport: httpx.AsyncBaseTransport | None = None,
     ):
-        account = (account or settings.snowflake_account or "").strip().lower().replace("_", "-")
-        self.token = token or settings.snowflake_pat
+        # None means "use the settings"; an explicit value (even empty) wins.
+        account = settings.snowflake_account if account is None else account
+        account = (account or "").strip().lower().replace("_", "-")
+        self.token = settings.snowflake_pat if token is None else token
         self.model = model or settings.cortex_model
         self.url = f"https://{account}.snowflakecomputing.com{PATH}"
         self.timeout = httpx.Timeout(timeout_s or settings.cortex_timeout_s, connect=10.0)
