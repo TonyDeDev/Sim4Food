@@ -9,9 +9,11 @@ over the week (start == end), so waste there falls back to
 purchases - consumption for that week alone.
 """
 from collections import defaultdict
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from app.db import get_pool
+from sim import history
+from sim.consumption import load_consumption
 
 
 def _week_start(d: date) -> date:
@@ -28,11 +30,16 @@ def _stock_at_or_before(counts: list[tuple[date, float]], d: date) -> float | No
     return result
 
 
+def _week_start_ts(week: date) -> datetime:
+    return datetime(week.year, week.month, week.day, tzinfo=timezone.utc)
+
+
 def build_waste_report(
     ingredients: list[dict],
     purchases: list[dict],
     counts: list[dict],
     consumption: list[dict],
+    cost_changes: list[dict] | None = None,
 ) -> dict:
     """Pure aggregation over already-fetched rows (DB-agnostic, testable).
 
@@ -40,10 +47,21 @@ def build_waste_report(
     purchases: [{ingredient_id, date, qty}]
     counts: [{ingredient_id, date, qty_on_hand}]
     consumption: [{ingredient_id, date, qty}]  (qty_sold * qty_per_serving, pre-joined)
+    cost_changes: [{ingredient_id, old_value, new_value, effective_at}] for unit_cost,
+        so each week is priced at the cost in force at the start of that week
+        instead of today's cost. Without it every week uses ingredients.unit_cost.
     """
     names = {row["id"]: row["name"] for row in ingredients}
     external_ids = {row["id"]: row["external_id"] for row in ingredients}
     unit_costs = {row["id"]: float(row["unit_cost"]) for row in ingredients}
+
+    cost_log: dict[str, list[tuple[datetime, float, float]]] = defaultdict(list)
+    for row in cost_changes or []:
+        cost_log[row["ingredient_id"]].append(
+            (row["effective_at"], float(row["old_value"]), float(row["new_value"]))
+        )
+    for entries in cost_log.values():
+        entries.sort(key=lambda entry: entry[0])
 
     counts_by_ingredient: dict[str, list[tuple[date, float]]] = defaultdict(list)
     for row in counts:
@@ -84,7 +102,11 @@ def build_waste_report(
             weekly.append({
                 "week_start": week.isoformat(),
                 "waste_qty": round(waste_qty, 3),
-                "waste_cost": round(waste_qty * unit_costs[ingredient_id], 2),
+                "waste_cost": round(
+                    waste_qty
+                    * history.value_at(unit_costs[ingredient_id], cost_log.get(ingredient_id, []), _week_start_ts(week)),
+                    2,
+                ),
             })
 
         by_ingredient.append({
@@ -105,7 +127,7 @@ async def compute_waste(restaurant_id: str) -> dict:
         # floats, and float addition is not associative, so an unordered fetch
         # let physical row order shift a total by a cent between runs.
         ingredients = await conn.fetch(
-            "SELECT id, external_id, name, unit_cost FROM ingredients WHERE restaurant_id = $1 ORDER BY external_id",
+            "SELECT id, external_id, name, unit_cost FROM ingredients WHERE restaurant_id = $1 AND current_id IS NULL ORDER BY external_id",
             restaurant_id,
         )
         purchases = await conn.fetch(
@@ -116,20 +138,18 @@ async def compute_waste(restaurant_id: str) -> dict:
             "SELECT ingredient_id, date, qty_on_hand FROM inventory_counts WHERE restaurant_id = $1 ORDER BY date, ingredient_id",
             restaurant_id,
         )
-        consumption = await conn.fetch(
-            """
-            SELECT r.ingredient_id, s.date, s.qty_sold * r.qty_per_serving AS qty
-            FROM sales s
-            JOIN recipes r ON r.menu_item_id = s.menu_item_id
-            WHERE s.restaurant_id = $1
-            ORDER BY s.date, r.ingredient_id
-            """,
+        cost_versions = await conn.fetch(
+            "SELECT COALESCE(current_id, id) AS ingredient_id, unit_cost, valid_from "
+            "FROM ingredients WHERE restaurant_id = $1 ORDER BY valid_from, id",
             restaurant_id,
         )
+        consumption = await load_consumption(conn, restaurant_id, [dict(r) for r in ingredients])
 
     return build_waste_report(
         [dict(r) for r in ingredients],
         [dict(r) for r in purchases],
         [dict(r) for r in counts],
-        [dict(r) for r in consumption],
+        consumption,
+        history.cost_changes([dict(r) for r in cost_versions]),
     )
+

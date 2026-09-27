@@ -18,8 +18,11 @@ REQUIRED_COLUMNS = {
     "inventory_counts": ["date", "ingredient_id", "qty_on_hand"],
 }
 
+# effective_date (YYYY-MM-DD) back-dates a changed value in the change log. Without
+# it a change is effective from the moment of upload.
 OPTIONAL_COLUMNS = {
-    "ingredients": ["shelf_life_days"],
+    "ingredients": ["shelf_life_days", "effective_date"],
+    "recipes": ["effective_date"],
 }
 
 NUMERIC_COLUMNS = {
@@ -32,6 +35,8 @@ NUMERIC_COLUMNS = {
 }
 
 DATE_COLUMNS = {
+    "ingredients": ["effective_date"],
+    "recipes": ["effective_date"],
     "sales": ["date"],
     "purchases": ["date"],
     "inventory_counts": ["date"],
@@ -91,6 +96,8 @@ def validate_upload(file_type: str, rows: list[dict]) -> dict:
                 errors.append(f"line {line}: {col} must not be negative: {num}")
 
         for col in date_cols:
+            if col in optional and _is_missing(row.get(col)):
+                continue
             if not _is_valid_date(row.get(col)):
                 errors.append(f"line {line}: {col} is not a valid date (YYYY-MM-DD): {row.get(col)!r}")
 

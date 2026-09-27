@@ -15,6 +15,8 @@ from __future__ import annotations
 import numpy as np
 import pandas as pd
 
+from sim import history
+
 WEEK = pd.Timedelta(days=7)
 
 FEATURE_COLUMNS = [
@@ -47,7 +49,16 @@ FEATURE_COLUMNS = [
     "unit_cost",
     "pack_size",
     "shelf_life_days",
+    "unit_cost_change_pct_4w",
+    "days_since_price_change",
+    "price_changed_recent_flag",
+    "recipe_qty_per_dish_sum",
+    "days_since_recipe_change",
+    "recipe_change_flag_4w",
 ]
+
+PRICE_RECENT_DAYS = 14
+RECIPE_RECENT_DAYS = 28
 
 TARGET = "next_week_usage"
 KEY_COLUMNS = ["restaurant_id", "ingredient_id", "forecast_week"]
@@ -88,13 +99,18 @@ def _stack(wide: pd.DataFrame, name: str) -> pd.Series:
     return s.rename(name)
 
 
-def weekly_usage(sales: pd.DataFrame, recipes: pd.DataFrame) -> pd.DataFrame:
+def weekly_usage(
+    sales: pd.DataFrame, recipes: pd.DataFrame, recipe_versions: pd.DataFrame | None = None
+) -> pd.DataFrame:
     """Long frame: week, ingredient_id, menu_item_id, usage (qty_sold x qty_per_serving).
 
     recipes.qty_per_serving is implicitly in the ingredient's own unit (no unit
-    column exists), so no conversion is applied.
+    column exists), so no conversion is applied. Each sale uses the recipe line
+    in force on its date (recipe_versions), so a later recipe edit does not
+    rewrite earlier weeks.
     """
-    joined = sales.merge(recipes, on="menu_item_id", how="inner")
+    versions = recipe_versions if recipe_versions is not None else history.open_recipe_versions(recipes)
+    joined = history.attach_recipes(sales, versions, "date")
     joined["usage"] = joined["qty_sold"].astype(float) * joined["qty_per_serving"].astype(float)
     joined["week"] = _week_start(joined["date"])
     return joined.groupby(["week", "ingredient_id", "menu_item_id"], as_index=False)["usage"].sum()
@@ -144,6 +160,8 @@ def build_feature_matrix(
     counts: pd.DataFrame | None = None,
     events: pd.DataFrame | None = None,
     include_next_week: bool = False,
+    ingredient_versions: pd.DataFrame | None = None,
+    recipe_versions: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Build the training matrix (KEY_COLUMNS + FEATURE_COLUMNS + TARGET).
 
@@ -154,6 +172,11 @@ def build_feature_matrix(
       purchases: date, ingredient_id, qty            (optional)
       counts: date, ingredient_id, qty_on_hand       (optional)
       events: type, start_date, end_date, items, expected_lift (optional)
+      ingredient_versions, recipe_versions: every version of each row, see sim.history (optional)
+
+    Ingredient specs and recipes are looked up as of each forecast week from the
+    versions. The include_next_week row always uses the current values, since
+    that is what the owner is about to order with.
 
     include_next_week adds one extra row per ingredient for the week after the
     last sales week, with a NaN target, for inference.
@@ -161,7 +184,7 @@ def build_feature_matrix(
     purchases = purchases if purchases is not None else pd.DataFrame(columns=["date", "ingredient_id", "qty"])
     counts = counts if counts is not None else pd.DataFrame(columns=["date", "ingredient_id", "qty_on_hand"])
 
-    usage_long = weekly_usage(sales, recipes)
+    usage_long = weekly_usage(sales, recipes, recipe_versions)
     if usage_long.empty:
         return pd.DataFrame(columns=KEY_COLUMNS + FEATURE_COLUMNS + [TARGET])
 
@@ -237,10 +260,36 @@ def build_feature_matrix(
 
     ev = _event_frames(events, recipes, weeks, ingredient_ids)
 
-    n_dishes = recipes.groupby("ingredient_id")["menu_item_id"].nunique()
-    n_dishes_w = pd.DataFrame({c: n_dishes[c] for c in ingredient_ids}, index=weeks).astype(float)
+    r_versions = recipe_versions if recipe_versions is not None else history.open_recipe_versions(recipes)
+    i_versions = ingredient_versions if ingredient_versions is not None else history.open_ingredient_versions(ingredients)
+    qty_sum_w, n_dishes_w = history.recipe_stats_asof(r_versions, weeks, ingredient_ids)
 
-    static = ingredients.set_index("ingredient_id")
+    def asof_spec(field: str, times: pd.DatetimeIndex) -> pd.DataFrame:
+        return history.asof_wide(history.field_versions(i_versions, field), times, ingredient_ids)
+
+    unit_cost_w = asof_spec("unit_cost", weeks)
+    pack_size_w = asof_spec("pack_size", weeks)
+    shelf_life_w = asof_spec("shelf_life_days", weeks)
+    unit_cost_4w_ago = asof_spec("unit_cost", weeks - 4 * WEEK).set_axis(weeks, axis=0)
+
+    if include_next_week:
+        # The upcoming week always uses today's values, whatever their valid_from.
+        static = ingredients.set_index("ingredient_id").reindex(ingredient_ids)
+        unit_cost_w.loc[weeks[-1]] = static["unit_cost"].astype(float).values
+        pack_size_w.loc[weeks[-1]] = static["pack_size"].astype(float).values
+        shelf_life_w.loc[weeks[-1]] = static["shelf_life_days"].astype(float).values
+        last = pd.DatetimeIndex([weeks[-1]])
+        now_sum, now_count = history.recipe_stats_asof(history.open_recipe_versions(recipes), last, ingredient_ids)
+        qty_sum_w.loc[weeks[-1]] = now_sum.iloc[0]
+        n_dishes_w.loc[weeks[-1]] = now_count.iloc[0]
+
+    with np.errstate(divide="ignore", invalid="ignore"):
+        price_change_pct = (unit_cost_w / unit_cost_4w_ago - 1.0).replace([np.inf, -np.inf], np.nan)
+    price_change_pct = price_change_pct.fillna(0.0)
+
+    since_price = history.days_since_change(weeks, ingredient_ids, history.price_change_times(i_versions))
+    since_recipe = history.days_since_change(weeks, ingredient_ids, history.recipe_change_times(r_versions))
+
     calendar_week = pd.Series(weeks.isocalendar().week.values.astype(float), index=weeks)
     calendar_month = pd.Series(weeks.month.values.astype(float), index=weeks)
 
@@ -265,6 +314,15 @@ def build_feature_matrix(
         "inventory_lag_1w": on_hand_prev_week,
         "inventory_to_usage_ratio": inv_ratio,
         "inventory_variance_4w": inventory_variance,
+        "days_since_price_change": since_price,
+        "price_changed_recent_flag": (since_price <= PRICE_RECENT_DAYS).astype(float),
+        "unit_cost_change_pct_4w": price_change_pct,
+        "recipe_qty_per_dish_sum": qty_sum_w,
+        "days_since_recipe_change": since_recipe,
+        "recipe_change_flag_4w": (since_recipe <= RECIPE_RECENT_DAYS).astype(float),
+        "unit_cost": unit_cost_w,
+        "pack_size": pack_size_w,
+        "shelf_life_days": shelf_life_w,
         **ev,
     }
 
@@ -274,8 +332,6 @@ def build_feature_matrix(
 
     matrix["week_of_year"] = matrix["forecast_week"].map(calendar_week)
     matrix["month"] = matrix["forecast_week"].map(calendar_month)
-    for col in ("unit_cost", "pack_size", "shelf_life_days"):
-        matrix[col] = matrix["ingredient_id"].map(static[col].astype(float))
     matrix.insert(0, "restaurant_id", restaurant_id)
 
     return matrix[KEY_COLUMNS + FEATURE_COLUMNS + [TARGET]].sort_values(

@@ -19,6 +19,7 @@ import xgboost as xgb
 from app import db
 from sim.dataset import load_frames
 from sim.dish_features import BASELINE, DISH_FEATURES, QTY, RATIO, RATIO_CLIP, build_dish_matrix
+from sim.history import attach_recipes, recipe_versions_of
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "models"
 TEST_WEEKS = 2
@@ -80,8 +81,14 @@ def predict_qty(model: xgb.XGBRegressor | None, df: pd.DataFrame) -> pd.Series:
 
 
 def to_ingredient_usage(df: pd.DataFrame, qty_col: str, recipes: pd.DataFrame) -> pd.Series:
-    """Weekly ingredient usage = sum over dishes and days of qty x qty_per_serving."""
-    joined = df[["forecast_week", "menu_item_id", qty_col]].merge(recipes, on="menu_item_id")
+    """Weekly ingredient usage = sum over dishes and days of qty x qty_per_serving.
+
+    `recipes` may be a recipe version frame (see sim.history), in which case each
+    day uses the recipe line in force on that day.
+    """
+    date_col = "date" if "date" in df.columns else "forecast_week"
+    cols = ["forecast_week", "menu_item_id", qty_col] + ([date_col] if date_col == "date" else [])
+    joined = attach_recipes(df[cols], recipes, date_col)
     joined["usage"] = joined[qty_col] * joined["qty_per_serving"]
     return joined.groupby(["forecast_week", "ingredient_id"])["usage"].sum()
 
@@ -151,7 +158,7 @@ async def main(restaurant_id: str) -> None:
     print(f"best iteration: {model.best_iteration}")
 
     print("\nIngredient-week metrics (test weeks):")
-    print(evaluate(model, matrix, test, frames["recipes"]).to_string())
+    print(evaluate(model, matrix, test, recipe_versions_of(frames)).to_string())
 
     importance = pd.Series(model.feature_importances_, index=DISH_FEATURES).sort_values(ascending=False)
     print("\nTop features:")
