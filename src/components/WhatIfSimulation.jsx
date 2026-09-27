@@ -52,7 +52,7 @@ export default function WhatIfSimulation() {
             <h2>Coming soon</h2>
           </div>
           <p className="alert-subtitle">
-            The agent-based simulation isn't wired up yet. Once it's ready, this will simulate a
+            The agent-based simulation isn&apos;t wired up yet. Once it&apos;s ready, this will simulate a
             week of customers under this scenario against your current stock on hand and flag
             anything likely to run out.
           </p>

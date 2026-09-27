@@ -654,14 +654,74 @@ form.stack {
   background: var(--cream-deep);
 }
 .stat-label { margin: 0 0 8px; font-size: 13px; color: var(--ink-soft); }
-.stat-value { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 600; color: var(--deep-green); }
+/* Value text is neutral ink by default - color is reserved for signals that
+   actually mean something (the delta line, and a tone override on cards
+   like Stock health where the number itself is a status). A plain fact like
+   revenue or a waste cost shouldn't be tinted green, which reads as "good". */
+.stat-value { margin: 0; font-family: 'Fraunces', Georgia, serif; font-size: 28px; font-weight: 600; color: var(--ink); }
 .stat-sub { margin: 6px 0 0; font-size: 12px; color: var(--ink-faint); }
+.stat-delta { margin: 4px 0 0; font-size: 12px; font-weight: 600; color: var(--ink-faint); }
+.stat-delta.up { color: var(--fresh-green); }
+.stat-delta.down { color: var(--error); }
+.stat-card-warn .stat-value { color: var(--amber); }
+.stat-card-bad .stat-value { color: var(--error); }
+.stat-card-good .stat-value { color: var(--fresh-green); }
 @media (max-width: 700px) {
   .stat-grid, .stat-grid.stat-grid-3 { grid-template-columns: 1fr 1fr; gap: 12px; }
 }
 @media (max-width: 480px) {
   .stat-grid, .stat-grid.stat-grid-3 { grid-template-columns: 1fr; }
 }
+
+.skeleton .skeleton-line {
+  background: var(--hairline);
+  border-radius: 6px;
+  animation: skeleton-pulse 1.4s ease-in-out infinite;
+}
+.skeleton-line-label { width: 60%; height: 12px; margin-bottom: 10px; }
+.skeleton-line-value { width: 45%; height: 24px; margin-bottom: 8px; }
+.skeleton-line-sub { width: 75%; height: 10px; }
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: .5; }
+  50% { opacity: 1; }
+}
+
+.btn-link {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--deep-green);
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.last-forecast-hint { margin: -8px 0 16px; }
+
+.table-toolbar { margin-bottom: 12px; }
+.table-search {
+  width: 100%;
+  max-width: 280px;
+  padding: 9px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 10px;
+  background: var(--cream);
+  font-size: 14px;
+  color: var(--ink);
+}
+.table-search:focus { outline: 2px solid var(--fresh-green); outline-offset: 1px; }
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.badge-good { background: var(--green-wash); color: var(--deep-green); }
+.badge-warn { background: #f7e6c4; color: var(--amber); }
+.badge-bad { background: #f5dbd3; color: var(--error); }
+.badge-neutral { background: var(--cream-deep); color: var(--ink-faint); }
 
 .alert-card {
   display: flex;

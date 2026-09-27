@@ -1,38 +1,26 @@
 import { useEffect, useState } from 'react'
 import { fetchLatestForecast, runForecast } from '../utils/api.js'
 import { formatDateTime } from '../utils/format.js'
+import Sparkline from './Sparkline.jsx'
+import StatCard from './StatCard.jsx'
 
-function Sparkline({ values }) {
-  const nums = values.filter((v) => v !== null && v !== undefined)
-  if (nums.length < 2) return <span className="pending-note">Not enough history</span>
-
-  const w = 90
-  const h = 28
-  const pad = 3
-  const min = Math.min(...nums)
-  const max = Math.max(...nums)
-  const range = max - min || 1
-  const points = nums.map((v, i) => {
-    const x = pad + (i / (nums.length - 1)) * (w - pad * 2)
-    const y = h - pad - ((v - min) / range) * (h - pad * 2)
-    return `${x.toFixed(1)},${y.toFixed(1)}`
-  }).join(' ')
-
-  return (
-    <svg viewBox={`0 0 ${w} ${h}`} width={w} height={h} className="sparkline" role="img" aria-label="Usage trend over recent weeks">
-      <polyline points={points} fill="none" stroke="var(--deep-green)" strokeWidth="1.5" />
-    </svg>
-  )
-}
 
 export default function ForecastOverview({ restaurantId }) {
   const [state, setState] = useState({ status: 'loading' })
   const [running, setRunning] = useState(false)
   const [runError, setRunError] = useState('')
 
+  // Reset to loading synchronously during render when restaurantId changes,
+  // rather than inside the effect (see "resetting state when a prop
+  // changes": https://react.dev/learn/you-might-not-need-an-effect).
+  const [syncedFor, setSyncedFor] = useState(null)
+  if (syncedFor !== restaurantId) {
+    setSyncedFor(restaurantId)
+    setState({ status: 'loading' })
+  }
+
   useEffect(() => {
     let cancelled = false
-    setState({ status: 'loading' })
     fetchLatestForecast(restaurantId)
       .then((data) => { if (!cancelled) setState({ status: 'ok', runAt: data.run_at, forecast: data.forecast }) })
       .catch((err) => { if (!cancelled) setState({ status: 'error', message: err.message }) })
@@ -70,7 +58,7 @@ export default function ForecastOverview({ restaurantId }) {
       {runError && <p className="field-error" role="alert">{runError}</p>}
 
       {!forecast ? (
-        <p className="hint">Click "Run forecast" to train a model on your uploaded sales and recipes.</p>
+        <p className="hint">Click &quot;Run forecast&quot; to train a model on your uploaded sales and recipes.</p>
       ) : forecast.data.weeks_of_history === 0 ? (
         <p className="hint">Upload sales, recipes, and menu data, then run the forecast.</p>
       ) : (
@@ -86,27 +74,15 @@ function ForecastResults({ forecast }) {
   return (
     <>
       <section className="stat-grid stat-grid-3" aria-label="Forecast summary">
-        <div className="stat-card">
-          <p className="stat-label">Weeks of history</p>
-          <p className="stat-value">{data.weeks_of_history}</p>
-          <p className="stat-sub">{data.first_week} to {data.last_week}</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-label">Forecasting for</p>
-          <p className="stat-value">Next week</p>
-          <p className="stat-sub">{data.forecast_week}</p>
-        </div>
-        <div className="stat-card">
-          <p className="stat-label">Forecast confidence</p>
-          <p className="stat-value">
-            {accuracy?.band_coverage ? `${Math.round(accuracy.band_coverage.inside_p10_p90 * 100)}%` : '—'}
-          </p>
-          <p className="stat-sub">
-            {accuracy?.band_coverage
-              ? 'how often actual usage landed in our predicted range'
-              : 'not enough history yet to check'}
-          </p>
-        </div>
+        <StatCard label="Weeks of history" value={data.weeks_of_history} sub={`${data.first_week} to ${data.last_week}`} />
+        <StatCard label="Forecasting for" value="Next week" sub={data.forecast_week} />
+        <StatCard
+          label="Forecast confidence"
+          value={accuracy?.band_coverage ? `${Math.round(accuracy.band_coverage.inside_p10_p90 * 100)}%` : '-'}
+          sub={accuracy?.band_coverage
+            ? 'how often actual usage landed in our predicted range'
+            : 'not enough history yet to check'}
+        />
       </section>
 
       {data.status !== 'established' && (

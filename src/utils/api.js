@@ -24,6 +24,14 @@ export async function fetchInventory(restaurantId) {
   return response.json()
 }
 
+// Headline numbers for the Home tab: revenue, waste, stock health, next event.
+export async function fetchHomeSummary(restaurantId) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId })
+  const response = await fetch(`${API_URL}/api/home-summary?${params}`, { credentials: 'include' })
+  if (!response.ok) throw new Error(`Could not load the summary (${response.status})`)
+  return response.json()
+}
+
 // {file_type: file_name} for whatever has actually been persisted - the
 // source of truth for "what's already uploaded", since a client-only
 // files map resets to empty on every fresh login/session restore.

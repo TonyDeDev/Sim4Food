@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app import db, repository
 from app.auth import get_current_user_id, verify_restaurant_owner
 from app.config import settings
-from sim import backtest, forecast_store, generator, ingest, inventory, waste
+from sim import backtest, forecast_store, generator, home_summary, ingest, inventory, waste
 from sim.dataset import load_frames
 from sim.forecast_payload import build_forecast_payload
 
@@ -70,6 +70,12 @@ async def get_waste(restaurant_id: str, user_id: str = Depends(get_current_user_
 async def get_inventory(restaurant_id: str, user_id: str = Depends(get_current_user_id)):
     await verify_restaurant_owner(restaurant_id, user_id)
     return await inventory.compute_inventory(restaurant_id)
+
+
+@app.get("/api/home-summary")
+async def get_home_summary(restaurant_id: str, user_id: str = Depends(get_current_user_id)):
+    await verify_restaurant_owner(restaurant_id, user_id)
+    return await home_summary.compute_home_summary(restaurant_id)
 
 
 @app.post("/api/simulate")

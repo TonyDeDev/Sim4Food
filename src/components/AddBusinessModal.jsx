@@ -14,15 +14,21 @@ export default function AddBusinessModal({ open, onClose, onSubmit }) {
   const requestRef = useRef(null)
   const locationRef = useRef(null)
 
-  useEffect(() => {
-    if (!open) return
-    setName('')
-    setType('')
-    setLocation('')
-    setSuggestions([])
-    setSuggestionsOpen(false)
-    setSubmitError('')
-  }, [open])
+  // Reset the form synchronously during render on each new opening, rather
+  // than inside an effect (see "resetting state when a prop changes":
+  // https://react.dev/learn/you-might-not-need-an-effect).
+  const [syncedOpen, setSyncedOpen] = useState(false)
+  if (open !== syncedOpen) {
+    setSyncedOpen(open)
+    if (open) {
+      setName('')
+      setType('')
+      setLocation('')
+      setSuggestions([])
+      setSuggestionsOpen(false)
+      setSubmitError('')
+    }
+  }
 
   useEffect(() => () => {
     clearTimeout(locationTimer.current)
