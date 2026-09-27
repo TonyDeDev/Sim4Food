@@ -3,13 +3,20 @@ import Sidebar from '../components/Sidebar.jsx'
 import AddBusinessModal from '../components/AddBusinessModal.jsx'
 import BusinessDetailsPanel from '../components/BusinessDetailsPanel.jsx'
 import RecordUploadCard from '../components/RecordUploadCard.jsx'
+import InventoryOverview from '../components/InventoryOverview.jsx'
 import { RECORD_FIELDS } from '../utils/api.js'
+
+const TABS = [
+  { key: 'records', label: 'Records' },
+  { key: 'inventory', label: 'Inventory' },
+]
 
 export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBusiness, onUploadRecord, onSignOut }) {
   const [collapsed, setCollapsed] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [activeId, setActiveId] = useState(businesses[0]?.id ?? null)
   const [detailsBusiness, setDetailsBusiness] = useState(null)
+  const [activeTab, setActiveTab] = useState('records')
   const selectedBusiness = businesses.find((business) => business.id === activeId) || businesses[0] || null
 
   function handleSelectBusiness(id) {
@@ -53,7 +60,7 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
         <div className="main-head">
           <div>
             <h1>{selectedBusiness?.name || 'Your businesses'}</h1>
-            <p>{selectedBusiness ? 'Upload each record below to include it in your waste estimate.' : 'Add a business to start estimating its food waste.'}</p>
+            <p>{selectedBusiness ? 'Upload records and see how long your stock will last.' : 'Add a business to start estimating its food waste.'}</p>
           </div>
         </div>
 
@@ -71,18 +78,37 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
             </button>
           </div>
         ) : selectedBusiness && (
-          <section className="business-record-grid" aria-label={`${selectedBusiness.name} records`}>
-            {RECORD_FIELDS.map(({ key, label }) => (
-              <RecordUploadCard
-                key={key}
-                fieldKey={key}
-                label={label}
-                restaurantId={selectedBusiness.name}
-                currentFile={selectedBusiness.files?.[key]}
-                onUploaded={handleRecordUploaded}
-              />
-            ))}
-          </section>
+          <>
+            <nav className="record-tabs" aria-label="Business view">
+              {TABS.map(({ key, label }) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={`record-tab${activeTab === key ? ' active' : ''}`}
+                  onClick={() => setActiveTab(key)}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+
+            {activeTab === 'records' && (
+              <section className="business-record-grid" aria-label={`${selectedBusiness.name} records`}>
+                {RECORD_FIELDS.map(({ key, label }) => (
+                  <RecordUploadCard
+                    key={key}
+                    fieldKey={key}
+                    label={label}
+                    restaurantId={selectedBusiness.name}
+                    currentFile={selectedBusiness.files?.[key]}
+                    onUploaded={handleRecordUploaded}
+                  />
+                ))}
+              </section>
+            )}
+
+            {activeTab === 'inventory' && <InventoryOverview />}
+          </>
         )}
       </main>
 

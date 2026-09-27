@@ -9,6 +9,13 @@ export const RECORD_FIELDS = [
   { key: 'inventory_counts', label: 'Inventory counts' },
 ]
 
+export async function fetchInventory(restaurantId) {
+  const params = new URLSearchParams({ restaurant_id: restaurantId })
+  const response = await fetch(`${API_URL}/api/inventory?${params}`)
+  if (!response.ok) throw new Error(`Could not load inventory (${response.status})`)
+  return response.json()
+}
+
 export async function uploadRecordFile(restaurantId, fileType, file) {
   const body = new FormData()
   body.append('file', file)

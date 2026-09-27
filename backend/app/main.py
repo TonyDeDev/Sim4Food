@@ -7,7 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app import db, repository
 from app.config import settings
-from sim import backtest, generator, ingest, waste
+from sim import backtest, generator, ingest, inventory, waste
 
 
 @asynccontextmanager
@@ -48,6 +48,11 @@ async def post_upload(restaurant_id: str, file_type: str, file: UploadFile):
 @app.get("/api/waste")
 async def get_waste(restaurant_id: str):
     return await waste.compute_waste(restaurant_id)
+
+
+@app.get("/api/inventory")
+async def get_inventory(restaurant_id: str):
+    return await inventory.compute_inventory(restaurant_id)
 
 
 @app.post("/api/simulate")

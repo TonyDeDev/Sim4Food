@@ -12,6 +12,7 @@
   --hairline: rgba(36, 92, 69, 0.22);
   --green-wash: #e6eee1;
   --error: #b3402a;
+  --amber: #a8720f;
 
   box-sizing: border-box;
   padding-top: env(safe-area-inset-top, 0px);
