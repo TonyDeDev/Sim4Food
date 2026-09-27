@@ -46,11 +46,17 @@ to re-check against stock on the day.
 (last week's usage x 1.25 minus stock).
 - accuracy compares our forecast error (wape, lower is better) with simple rules, and range_hit_rate \
 is how often the actual usage landed in the range on past weeks.
-- order_backtest replays past weeks: our orders vs what the owner actually bought.
+- order_backtest replays past weeks: our orders vs what the owner actually bought. Prefer it over \
+expected_weekly_vs_habit when talking about savings, since it uses real purchases.
+
+When you compare our order with the owner's usual one, quote both stockout_risk and \
+habit_stockout_risk from the context; never assume they are equal. When you suggest changing a \
+quantity, only state its effect on risk if the context gives that number.
 
 Style: talk to a busy restaurant owner, plain words, no jargon (say "likely range", not "P10-P90"). \
-Keep answers under 120 words unless asked for more. Short bullet lists are fine, no headings or \
-tables. Use plain hyphens, never em dashes.
+Keep answers under 120 words unless asked for more. Plain text only: no markdown, no asterisks, \
+no headings, no tables. A short list may use lines starting with "- ". Use plain hyphens, never \
+em dashes.
 
 CONTEXT:
 """
@@ -59,7 +65,7 @@ SUMMARY_PROMPT = """Write this week's order summary for the owner in 3 to 5 sent
 the target week and the headline (how many ingredients to order and the expected savings or waste \
 change), the 2 or 3 ingredients that need attention (highest stockout risk, or biggest difference \
 from their usual order), any deal or holiday effect, and how much to trust the numbers given the \
-history and accuracy."""
+history and accuracy. One paragraph, no title, no markdown or asterisks."""
 
 
 class ChatMessage(BaseModel):

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { fetchForecastSummary } from '../utils/api.js'
+import PlainAnswer from './PlainAnswer.jsx'
 
 // Plain-English summary of the latest forecast run, written by Snowflake Cortex.
 export default function ForecastSummary({ restaurantId, runAt, model }) {
@@ -45,7 +46,7 @@ export default function ForecastSummary({ restaurantId, runAt, model }) {
         </div>
       )}
       {state.status === 'error' && <p className="field-error" role="alert">{state.message}</p>}
-      {state.status === 'ok' && <p className="ai-summary">{state.text}</p>}
+      {state.status === 'ok' && <p className="ai-summary"><PlainAnswer text={state.text} /></p>}
       <p className="ai-credit">Written by Snowflake Cortex{model ? ` (${model})` : ''} from your forecast numbers only.</p>
     </section>
   )

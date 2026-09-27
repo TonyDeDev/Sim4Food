@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { streamForecastChat } from '../utils/api.js'
+import PlainAnswer from './PlainAnswer.jsx'
 
 const SUGGESTIONS = [
   'What should I order first on Monday?',
@@ -90,7 +91,7 @@ export default function ForecastChat({ restaurantId, runAt }) {
         ) : (
           messages.map((m, i) => (
             <p key={i} className={`chat-bubble ${m.role}`}>
-              {m.content || (busy && i === messages.length - 1 ? <span className="typing" aria-label="Thinking" /> : null)}
+              {m.content ? <PlainAnswer text={m.content} /> : (busy && i === messages.length - 1 ? <span className="typing" aria-label="Thinking" /> : null)}
             </p>
           ))
         )}
