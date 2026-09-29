@@ -39,10 +39,7 @@ export default function Signup({ onSignup, goToLogin }) {
   }
 
   return (
-    <AuthLayout
-      quote="Set up in an afternoon. We had our first waste report by Friday."
-      cite="Marcus Idowu, The Green Table"
-    >
+    <AuthLayout>
       <h1>Create your account</h1>
       <p className="lede">
         Already have one?{' '}

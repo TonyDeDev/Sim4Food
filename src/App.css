@@ -19,18 +19,15 @@
   text-decoration: none;
   color: var(--cream);
 }
-.side-quote blockquote {
-  font-size: clamp(24px, 2.4vw, 32px);
+.side-slogan {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  font-size: clamp(30px, 3.2vw, 44px);
   font-style: italic;
   font-weight: 400;
-  line-height: 1.32;
-  margin: 0 0 18px;
-  max-width: 22ch;
-}
-.side-quote cite {
-  font-style: normal;
-  font-size: 15px;
-  color: rgba(255, 248, 234, 0.72);
+  line-height: 1.2;
 }
 .side-foot {
   font-size: 14px;

@@ -21,7 +21,7 @@ export default function Login({ onLogin, goToSignup }) {
   }
 
   return (
-    <AuthLayout quote="We finally know where the food was actually going." cite="Dana Wu, Millbrook Cafe">
+    <AuthLayout>
       <h1>Welcome back</h1>
       <p className="lede">
         New to Sim4Food?{' '}
