@@ -1,4 +1,4 @@
-export default function AuthLayout({ quote, cite, children }) {
+export default function AuthLayout({ children }) {
   return (
     <div className="auth-page">
       <aside className="auth-side">
@@ -6,8 +6,11 @@ export default function AuthLayout({ quote, cite, children }) {
           Sim4Food
         </a>
         <div className="side-quote">
-          <blockquote>&ldquo;{quote}&rdquo;</blockquote>
-          <cite>- {cite}</cite>
+          <p className="side-slogan">
+            <span>Waste less.</span>
+            <span>Save more.</span>
+            <span>Make an impact.</span>
+          </p>
         </div>
         <p className="side-foot">© 2026 Sim4Food</p>
       </aside>

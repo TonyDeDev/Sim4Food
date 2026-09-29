@@ -69,6 +69,13 @@ function DashboardPreview() {
   )
 }
 
+const TEAM = [
+  { name: 'Tony Pham', url: 'https://www.linkedin.com/in/tonypham06/' },
+  { name: 'Phuntsho Wangyal', url: 'https://www.linkedin.com/in/phuntsho-wangyal/' },
+  { name: 'Christopher Lin', url: 'https://www.linkedin.com/in/christopher-lin-50b88537a/' },
+  { name: 'Jeevaka Weerakoon', url: 'https://www.linkedin.com/in/jeevaka-weerakoon-295b39322/' },
+]
+
 export default function IntroPage({ onLogin, onSignup }) {
   useEffect(() => {
     const items = document.querySelectorAll('[data-reveal]')
@@ -183,14 +190,23 @@ export default function IntroPage({ onLogin, onSignup }) {
 
         <section className="contact-section" id="contact">
           <div className="contact-top" data-reveal>
-            <div><p className="eyebrow">LET’S MAKE FOOD GO FURTHER</p><h2>Have a question<br />or an idea?</h2></div>
-            <a className="contact-email" href="mailto:hello@sim4food.example">hello@sim4food.example <ArrowIcon /></a>
+            <div><p className="eyebrow">LET’S MAKE FOOD GO FURTHER</p><h2>Contact us</h2></div>
+            <p className="contact-lede">Meet the team behind Sim4Food. Say hello on LinkedIn.</p>
           </div>
+          <ul className="contact-team" data-reveal>
+            {TEAM.map((person) => (
+              <li key={person.url}>
+                <a href={person.url} target="_blank" rel="noreferrer" aria-label={`${person.name} on LinkedIn`}>
+                  <span className="contact-name">{person.name}</span>
+                  <span className="contact-link">LinkedIn <span>↗</span></span>
+                </a>
+              </li>
+            ))}
+          </ul>
           <div className="contact-bottom">
             <a className="intro-wordmark footer-wordmark" href="#home"><Mark /><span>sim<span>4</span>food</span></a>
             <p>Thoughtful tools for a more resourceful food system.</p>
-            <div className="social-links"><a href="https://www.instagram.com/" target="_blank" rel="noreferrer">Instagram <span>↗</span></a><a href="https://www.linkedin.com/" target="_blank" rel="noreferrer">LinkedIn <span>↗</span></a></div>
-            <small>© 2026 Sim4Food · Contact details are placeholders</small>
+            <small>© 2026 Sim4Food</small>
           </div>
         </section>
       </main>

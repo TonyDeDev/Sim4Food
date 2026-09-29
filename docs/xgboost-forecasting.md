@@ -6,7 +6,7 @@ This document describes the XGBoost forecasting layer for SwarmStock and the ord
 It forecasts the theoretical usage of each ingredient for the target week from POS sales and recipes stored in Neon, and turns that forecast into an order per delivery day.
 The V2 section right below is the current design.
 The V1 sections after it are kept for the reasoning and the history of the numbers.
-The audit that motivated V2 is in [xgboost-audit.md](xgboost-audit.md).
+The audit that motivated V2 is in [xgboost-audit.md](internal/xgboost-audit.md).
 
 Pipeline (V2):
 
