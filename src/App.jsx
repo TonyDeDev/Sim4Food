@@ -60,6 +60,12 @@ export default function App() {
     setBusinesses((prev) => [...prev, business])
   }
 
+  // Called only after the server has confirmed the delete, so the list never
+  // shows a business as gone while it still exists.
+  function handleDeleteBusiness(id) {
+    setBusinesses((prev) => prev.filter((business) => business.id !== id))
+  }
+
   // Stable identity: Dashboard re-hydrates upload status in an effect that depends on it.
   const handleUpdateBusiness = useCallback((id, updates) => {
     setBusinesses((prev) => prev.map((business) => business.id === id ? { ...business, ...updates } : business))
@@ -90,5 +96,5 @@ export default function App() {
     return <Signup onSignup={handleSignup} goToLogin={() => setScreen('login')} />
   }
 
-  return <Dashboard user={user} businesses={businesses} onAddBusiness={handleAddBusiness} onUpdateBusiness={handleUpdateBusiness} onUploadRecord={handleUploadRecord} onSignOut={handleSignOut} />
+  return <Dashboard user={user} businesses={businesses} onAddBusiness={handleAddBusiness} onUpdateBusiness={handleUpdateBusiness} onDeleteBusiness={handleDeleteBusiness} onUploadRecord={handleUploadRecord} onSignOut={handleSignOut} />
 }

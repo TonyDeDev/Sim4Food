@@ -231,6 +231,26 @@ def test_newsvendor_service_level_follows_costs():
     assert costs.loc["bun", "q_star"] == 0.95  # clipped
 
 
+def test_shared_lost_margin_is_not_counted_once_per_recipe_line():
+    """A burger short is one lost burger, not one per ingredient in it."""
+    recipe = pd.DataFrame({"beef": [0.2], "bun": [1.0], "cheese": [0.05]}, index=["burger"])
+    ingredients = pd.DataFrame({
+        "ingredient_id": ["beef", "bun", "cheese"], "unit_cost": [10.0, 0.5, 12.0],
+        "pack_size": [5.0, 12.0, 1.0], "shelf_life_days": [4, 30, 30],
+    })
+    menu = pd.DataFrame({"menu_item_id": ["burger"], "price": [15.0]})
+    totals = pd.Series({"burger": 100.0})
+    costs = recommend.unit_costs(ingredients, recipe, menu, totals)
+
+    # One serving short of each ingredient at once is still one lost burger.
+    margin = 15.0 - (0.2 * 10.0 + 1.0 * 0.5 + 0.05 * 12.0)
+    servings_worth = sum(costs.loc[i, "cu_share"] * recipe.loc["burger", i] for i in recipe.columns)
+    assert servings_worth == pytest.approx(recommend.LOST_SALE_SHARE * margin)
+    # cu still prices the whole dish against each ingredient's own order.
+    for i in recipe.columns:
+        assert costs.loc[i, "cu"] == pytest.approx(costs.loc[i, "cu_share"] * len(recipe.columns))
+
+
 def test_adaptive_policy_tops_up_after_a_busy_first_half():
     demand = np.array([[30.0, 40.0]])
     forecast = np.array([20.0, 20.0])
@@ -243,7 +263,7 @@ def test_adaptive_policy_tops_up_after_a_busy_first_half():
 
 
 def test_order_backtest_compares_with_actual_purchases():
-    costs = pd.DataFrame({"co": [1.0], "cu": [4.0], "q_star": [0.8], "perishable": [True], "unit_cost": [1.0], "pack_size": [1.0]}, index=["beef"])
+    costs = pd.DataFrame({"co": [1.0], "cu": [4.0], "cu_share": [2.0], "q_star": [0.8], "perishable": [True], "unit_cost": [1.0], "pack_size": [1.0]}, index=["beef"])
     week = {
         "week": pd.Timestamp("2026-08-03"),
         "on_hand": pd.Series({"beef": 0.0}),

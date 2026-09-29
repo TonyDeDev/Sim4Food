@@ -230,6 +230,10 @@ def build_forecast_payload(frames: dict, today: date | None = None, target_week=
             "band_coverage": {**mc, "target_inside": TARGET_COVERAGE} if mc else None,
             "band_comparison": quality,
             "spread_scale": round(scale, 2),
+            # Below MIN_CALIBRATION_WEEKS the spread is bounded rather than fit
+            # (sim/uncertainty.fit_scale), so the bands are provisional.
+            "calibration_weeks": len(evals),
+            "spread_scale_provisional": len(evals) < uncertainty.MIN_CALIBRATION_WEEKS,
             "stockout_days_excluded": int(dish_bt[CENSORED].sum()),
         }
 

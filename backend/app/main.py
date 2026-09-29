@@ -57,7 +57,13 @@ async def post_upload(
         return validation
 
     persisted = await repository.persist_upload(db.get_pool(), restaurant_id, file_type, file.filename, rows)
-    return {**validation, **persisted}
+    # A file can pass validation and still store nothing: recipes naming a dish
+    # or ingredient that has not been uploaded yet resolve to no row. Those are
+    # reported per row, so merging `persisted` in without recomputing `status`
+    # used to answer "ok" for an upload that persisted nothing - the card showed
+    # the file as accepted and the forecast then asked for the same file again.
+    status = "ok" if not persisted["errors"] else "error"
+    return {**validation, **persisted, "status": status}
 
 
 @app.get("/api/uploads")

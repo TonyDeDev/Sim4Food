@@ -262,6 +262,32 @@ def _delivery_schedule(target: float, opening_stock: float, shelf_life_days, pac
     return schedule
 
 
+def _mean_ingredient_demand(
+    runs: list[np.ndarray], dishes: list[dict], recipe_map: dict[str, dict[str, float]]
+) -> dict[str, float]:
+    """Mean weekly requirement per ingredient across the draws, before any stock limit."""
+    mean_dish = np.mean(np.asarray(runs), axis=0)
+    totals: dict[str, float] = {}
+    for idx, dish in enumerate(dishes):
+        for ingredient_id, quantity in recipe_map[dish["id"]].items():
+            totals[ingredient_id] = totals.get(ingredient_id, 0.0) + float(mean_dish[idx]) * quantity
+    return totals
+
+
+def _habit_deliveries(
+    demand_mean: dict[str, float], ingredients: list[dict], habit_multiplier: float
+) -> dict[str, list[dict]]:
+    """The owner's current rule as a delivery schedule: one drop, a fixed cushion over expected usage."""
+    schedules = {}
+    for ingredient in ingredients:
+        quantity = _round_up_to_pack(
+            demand_mean.get(ingredient["id"], 0.0) * habit_multiplier, _number(ingredient.get("pack_size"))
+        )
+        if quantity > 0:
+            schedules[ingredient["id"]] = [{"day": 0, "qty": round(quantity, 3)}]
+    return schedules
+
+
 def _financials(
     fulfilment: dict,
     dishes: list[dict],
@@ -273,7 +299,14 @@ def _financials(
     deal_item: str,
     apply_discount: bool,
 ) -> dict:
-    """Attach one simulated week's money outcomes to its fulfilment record."""
+    """Attach one simulated week's money outcomes to its fulfilment record.
+
+    ``profit`` is cash: revenue actually taken, less the food it consumed and
+    the stock that expired. ``lost_sales_cost`` is reported beside it but is
+    deliberately not subtracted from it - a walkout is already absent from
+    ``revenue``, so charging its margin again would count the same stockout
+    twice and can drive profit negative on a week that made money.
+    """
     revenue = 0.0
     food_cost = 0.0
     lost_sales_cost = 0.0
@@ -293,7 +326,7 @@ def _financials(
         "food_cost": food_cost,
         "waste_cost": waste_cost,
         "lost_sales_cost": lost_sales_cost,
-        "profit": revenue - food_cost - waste_cost - lost_sales_cost,
+        "profit": revenue - food_cost - waste_cost,
         "fulfilled_sales": int(sum(fulfilment["dish_fulfilled"])),
         "unconstrained_demand": int(sum(fulfilment["dish_demand"])),
     })
@@ -383,7 +416,27 @@ def forecast_demand(calibration_params: dict, scenario: dict, n_runs: int = 300)
 
     metric_runs = {key: [] for key in results}
     current_stock = {ingredient["id"]: _number(ingredient.get("qty_on_hand")) for ingredient in ingredients}
+    # Both arms restock the way the owner already does. Without it the week is
+    # opening stock and nothing else, which starves a restaurant that in reality
+    # takes deliveries - it reads as a near-total stockout and makes every money
+    # figure a measure of buying nothing rather than of the scenario.
+    # The schedule is sized off baseline demand for both arms on purpose: an
+    # owner orders before the deal or holiday lands, so holding the plan fixed
+    # is what lets the comparison show what the event does to their stock.
+    current_habit = _habit_deliveries(
+        _mean_ingredient_demand(results["baseline"], dishes, recipe_map), ingredients, habit_multiplier
+    )
     for key, runs in results.items():
+        deliveries = {ingredient_id: list(scheduled) for ingredient_id, scheduled in current_habit.items()}
+        if key == "scenario":
+            # An ingredient the scenario pins - a stock level dialled in, or a
+            # named delivery - is under the caller's control for the week. The
+            # routine drop is dropped for it, or it would quietly refill the
+            # shelf and cancel out the lever the caller just pulled.
+            for ingredient_id in set(stock_overrides) | set(scenario_deliveries):
+                deliveries.pop(ingredient_id, None)
+            for ingredient_id, scheduled in scenario_deliveries.items():
+                deliveries.setdefault(ingredient_id, []).extend(scheduled)
         for demand in runs:
             stock = dict(current_stock)
             if key == "scenario":
@@ -391,7 +444,7 @@ def forecast_demand(calibration_params: dict, scenario: dict, n_runs: int = 300)
             fulfilment = _fulfil_week(
                 demand, dishes, recipe_map, stock, base_mix, rng,
                 substitution_rate=substitution_rate,
-                deliveries=scenario_deliveries if key == "scenario" else None,
+                deliveries=deliveries,
                 shelf_life=shelf_life,
             )
             metric_runs[key].append(_financials(

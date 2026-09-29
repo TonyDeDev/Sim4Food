@@ -99,8 +99,10 @@ export default function WhatIfSimulation({ restaurantId, restaurantName }) {
     ['Revenue', result.baseline.revenue.p50, result.scenario.revenue.p50],
     ['Ingredient cost', result.baseline.food_cost.p50, result.scenario.food_cost.p50],
     ['Expired food cost', result.baseline.waste_cost.p50, result.scenario.waste_cost.p50],
-    ['Lost-sales cost', result.baseline.lost_sales_cost.p50, result.scenario.lost_sales_cost.p50],
-    ['Profit after waste and lost sales', result.baseline.profit.p50, result.scenario.profit.p50],
+    // Lost-sales cost is the margin walkouts would have earned. It sits beside
+    // profit rather than inside it: those sales are already missing from revenue.
+    ['Lost-sales cost (not in profit)', result.baseline.lost_sales_cost.p50, result.scenario.lost_sales_cost.p50],
+    ['Profit after waste', result.baseline.profit.p50, result.scenario.profit.p50],
   ] : []
 
   return <>

@@ -181,3 +181,12 @@ export async function createRestaurant({ name, type, location }) {
   const result = await postJson('/api/restaurants', { name, type, location })
   return result.restaurant
 }
+
+// Irreversible: the restaurant's records, forecasts and history go with it
+// (every child table cascades). Callers confirm with the user first.
+export async function deleteRestaurant(restaurantId) {
+  const response = await fetch(`/api/restaurants/${encodeURIComponent(restaurantId)}`, { method: 'DELETE' })
+  const result = await response.json().catch(() => null)
+  if (!response.ok) throw new Error(result?.error || `Could not delete this business (${response.status})`)
+  return result.deleted
+}

@@ -6,6 +6,10 @@ For each ingredient and the target week:
     Cu = cost of one unit short       (margin of the dishes that cannot be sold)
     q* = Cu / (Cu + Co)               (clipped to Q_BOUNDS)
 
+Cu sizes each ingredient's own order, so it carries the whole margin of the
+dishes it would block. Reported dollars use Cu_share instead, which splits a
+dish's margin across the ingredients it needs - see unit_costs.
+
 Orders follow the restaurant's own delivery rhythm, read from its purchase
 history (e.g. Monday and Thursday). The first delivery is a firm order: the q*
 quantile of that cycle's usage minus the stock on hand. Later deliveries are a
@@ -93,10 +97,22 @@ def daily_usage(sales: pd.DataFrame, recipes: pd.DataFrame) -> pd.DataFrame:
 def unit_costs(
     ingredients: pd.DataFrame, recipe: pd.DataFrame, menu: pd.DataFrame | None, dish_totals: pd.Series
 ) -> pd.DataFrame:
-    """Per ingredient: co, cu, q_star, perishable, unit_cost, pack_size.
+    """Per ingredient: co, cu, cu_share, q_star, perishable, unit_cost, pack_size.
 
     recipe: dishes x ingredients qty_per_serving (sim.uncertainty.recipe_matrix).
     dish_totals: forecast servings per dish, used to weight the dishes an ingredient goes into.
+
+    Two underage costs, because the ordering decision and the money report need
+    different ones:
+
+    - `cu` prices one unit short for *this* ingredient's own order. Running out
+      of it blocks the whole dish, so the whole dish margin is what that unit
+      was worth, and `q_star` is built from it.
+    - `cu_share` splits each dish's margin across the ingredients the dish
+      needs. Only this one may be summed across ingredients: a burger that is
+      short is one lost burger, not one per ingredient in it, so adding up `cu`
+      dollars would count the same stockout once per line of the recipe (six
+      times over, for a six-ingredient dish).
     """
     ing = ingredients.set_index("ingredient_id")
     for col, default in (("unit_cost", 0.0), ("pack_size", np.nan), ("shelf_life_days", np.nan)):
@@ -109,6 +125,9 @@ def unit_costs(
         if menu is not None and not menu.empty else pd.Series(np.nan, index=recipe.index)
     )
     margin = (price - food_cost).clip(lower=0.0)
+    # How many ingredients each dish needs, i.e. how many lines of the recipe
+    # would each claim the dish's margin for themselves.
+    lines = (recipe > 0).sum(axis=1).clip(lower=1)
 
     rows = {}
     for i in recipe.columns:
@@ -118,16 +137,19 @@ def unit_costs(
         perishable = is_perishable(ing["shelf_life_days"].get(i))
         co = unit if perishable else CARRY_COST_SHARE * unit
         per_unit_margin = (margin[used] / qps[used]).dropna()
+        shared_margin = (margin[used] / lines[used] / qps[used]).dropna()
         w = (dish_totals.reindex(recipe.index).fillna(0.0) * qps).reindex(per_unit_margin.index)
         if per_unit_margin.empty or w.sum() <= 0:
-            cu = co  # no prices: short and over cost the same, order the median
+            # No prices: short and over cost the same, order the median.
+            cu = cu_share = co
         else:
             cu = LOST_SALE_SHARE * float(np.average(per_unit_margin, weights=w))
+            cu_share = LOST_SALE_SHARE * float(np.average(shared_margin, weights=w.reindex(shared_margin.index)))
         q = cu / (cu + co) if (cu + co) > 0 else 0.5
         pack = float(ing["pack_size"].get(i, np.nan))
         rows[i] = {
-            "co": co, "cu": cu, "q_star": float(np.clip(q, *Q_BOUNDS)), "perishable": perishable,
-            "unit_cost": unit, "pack_size": pack,
+            "co": co, "cu": cu, "cu_share": cu_share, "q_star": float(np.clip(q, *Q_BOUNDS)),
+            "perishable": perishable, "unit_cost": unit, "pack_size": pack,
         }
     return pd.DataFrame.from_dict(rows, orient="index")
 
@@ -251,7 +273,8 @@ def recommend(
 
         def money(end_stock, shortage):
             waste = float(end_stock.mean()) * c["unit_cost"] if c["perishable"] else 0.0
-            return waste, float(shortage.mean()) * c["cu"]
+            # cu_share, not cu: these rows get summed across ingredients.
+            return waste, float(shortage.mean()) * c["cu_share"]
 
         our_waste, our_lost = money(end, short)
         their_waste, their_lost = money(h_end, h_short)
@@ -316,7 +339,7 @@ def order_backtest(weeks: list[dict], costs: pd.DataFrame) -> dict | None:
                     "week": w["week"], "ingredient_id": i, "who": who,
                     "bought_cost": float(qty) * c["unit_cost"],
                     "waste_cost": float(e) * c["unit_cost"] if c["perishable"] else 0.0,
-                    "lost_margin": float(s) * c["cu"],
+                    "lost_margin": float(s) * c["cu_share"],
                 })
     df = pd.DataFrame(rows)
     totals = df.groupby("who")[["bought_cost", "waste_cost", "lost_margin"]].sum()

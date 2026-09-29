@@ -23,6 +23,7 @@ newsvendor quantile is rarely 0.5 or 0.9).
 """
 from __future__ import annotations
 
+import hashlib
 from dataclasses import dataclass
 
 import numpy as np
@@ -36,6 +37,9 @@ SEED = 7
 TARGET_COVERAGE = 0.8
 MIN_PER_DISH = 3
 MIN_PRIOR_WEEKS = 2
+MIN_CALIBRATION_WEEKS = 8  # below this the coverage estimate is too coarse to trust on its own
+DEFAULT_SCALE = 1.0  # the raw out-of-sample residual spread, uncalibrated
+SMALL_SAMPLE_BOUNDS = (1.0, 2.0)
 SCALE_GRID = np.round(np.arange(0.5, 3.0001, 0.05), 2)
 EVENT_LOG_SD = 0.15  # extra spread on dishes whose forecast carries an event lift
 QUANTILES = (0.1, 0.5, 0.9)
@@ -78,13 +82,25 @@ def fit_residuals(res: pd.DataFrame) -> Residuals | None:
     return Residuals(week.to_numpy(), by_dish, res["noise"].to_numpy())
 
 
+def _dish_rng(seed: int, dish: str) -> np.random.Generator:
+    """An independent draw stream per dish, keyed by the dish rather than its position.
+
+    Drawing every dish from one shared stream makes the answer depend on the
+    order the menu happens to be listed in: the k-th dish consumes the k-th
+    block of the stream, so re-sorting the menu re-draws every dish and moves
+    every band, order quantity and saving. Keying the stream to the dish id
+    makes a dish's draw depend only on that dish.
+    """
+    digest = hashlib.blake2b(str(dish).encode(), digest_size=8).digest()
+    return np.random.default_rng([seed, int.from_bytes(digest, "big")])
+
+
 def draw_log_multipliers(resid: Residuals | None, dishes: list[str], n: int = N_SAMPLES, seed: int = SEED) -> np.ndarray:
     """(n, len(dishes)) draws of week effect + dish noise; all zeros without residuals."""
     if resid is None:
         return np.zeros((n, len(dishes)))
-    rng = np.random.default_rng(seed)
-    week = rng.choice(resid.week_effects, n)
-    noise = [rng.choice(resid.noise.get(d, resid.pooled), n) for d in dishes]
+    week = np.random.default_rng(seed).choice(resid.week_effects, n)
+    noise = [_dish_rng(seed, d).choice(resid.noise.get(d, resid.pooled), n) for d in dishes]
     return week[:, None] + (np.column_stack(noise) if dishes else np.zeros((n, 0)))
 
 
@@ -136,12 +152,43 @@ def _coverage(evals: list[Evaluation], scale: float) -> float:
     return float(((banded["actual"] >= banded["p10"]) & (banded["actual"] <= banded["p90"])).mean())
 
 
+def _crossing(coverage: np.ndarray, target: float) -> float:
+    """Scale at which coverage first reaches `target`, linearly interpolated.
+
+    Coverage rises with scale, but only in steps of 1/n: with a handful of
+    backtest weeks several grid points tie for "closest to target", and picking
+    the argmin among them turns rounding noise into a band width - the same
+    data answering 1.55 or 1.35 depending on how the dishes happened to sort.
+    Interpolating between the two grid points that bracket the crossing makes
+    the scale a continuous function of the coverage curve instead.
+    """
+    reached = np.flatnonzero(coverage >= target)
+    if not len(reached):
+        return float(SCALE_GRID[-1])
+    hi = int(reached[0])
+    if hi == 0:
+        return float(SCALE_GRID[0])
+    lo = hi - 1
+    span = coverage[hi] - coverage[lo]
+    fraction = (target - coverage[lo]) / span if span > 0 else 0.0
+    return float(SCALE_GRID[lo] + fraction * (SCALE_GRID[hi] - SCALE_GRID[lo]))
+
+
 def fit_scale(evals: list[Evaluation], target: float = TARGET_COVERAGE) -> float:
-    """Smallest scale whose P10-P90 coverage over `evals` is closest to target; 1.0 without evals."""
+    """Spread multiplier whose P10-P90 covers `target` of past weeks; DEFAULT_SCALE without evals.
+
+    Under MIN_CALIBRATION_WEEKS the coverage is measured on so few weeks (and
+    the ingredients within a week share one week effect, so they are far from
+    independent) that the fit is bounded rather than taken at face value: it
+    may not narrow the raw residual spread, nor inflate it beyond doubling.
+    """
     if not evals:
-        return 1.0
-    gaps = [abs(_coverage(evals, s) - target) for s in SCALE_GRID]
-    return float(SCALE_GRID[int(np.argmin(gaps))])
+        return DEFAULT_SCALE
+    coverage = np.array([_coverage(evals, s) for s in SCALE_GRID])
+    scale = _crossing(coverage, target)
+    if len(evals) >= MIN_CALIBRATION_WEEKS:
+        return scale
+    return float(np.clip(scale, *SMALL_SAMPLE_BOUNDS))
 
 
 def interval_metrics(banded: pd.DataFrame, level: float = 0.8) -> dict:

@@ -9,16 +9,20 @@ ALWAYS = repository.ALWAYS
 class FakeConn:
     """Just enough of asyncpg.Connection to record what the upload handlers write."""
 
-    def __init__(self, ingredients=(), recipes=()):
+    def __init__(self, ingredients=(), recipes=(), known_ingredients=None, known_items=None):
         self.ingredients = list(ingredients)
         self.recipes = list(recipes)
+        # An empty map is what a restaurant that has not uploaded that file yet
+        # looks like to the recipe handler.
+        self.known_ingredients = {"beef": "i-beef", "bun": "i-bun"} if known_ingredients is None else known_ingredients
+        self.known_items = {"burger": "m-burger", "wrap": "m-wrap"} if known_items is None else known_items
         self.executed: list[tuple[str, list]] = []
 
     async def fetch(self, sql, *args):
         if "SELECT external_id, id FROM ingredients" in sql:
-            return [{"external_id": "beef", "id": "i-beef"}, {"external_id": "bun", "id": "i-bun"}]
+            return [{"external_id": k, "id": v} for k, v in self.known_ingredients.items()]
         if "SELECT external_id, id FROM menu_items" in sql:
-            return [{"external_id": "burger", "id": "m-burger"}, {"external_id": "wrap", "id": "m-wrap"}]
+            return [{"external_id": k, "id": v} for k, v in self.known_items.items()]
         if "FROM ingredients" in sql:
             assert "current_id IS NULL" in sql, "history rows must never be treated as current"
             return self.ingredients
@@ -154,6 +158,23 @@ def test_identical_recipe_reupload_writes_nothing():
     rows = [recipe_row("burger", "beef", 0.2), recipe_row("burger", "bun", 1), recipe_row("wrap", "beef", 0.1)]
     assert run(repository.insert_recipes(conn, "r1", rows)) == []
     assert conn.executed == []
+
+
+def test_recipes_naming_an_unuploaded_dish_store_nothing_and_say_which_file_is_missing():
+    """The upload that used to report success while persisting nothing.
+
+    A recipe line can only be stored once the dish and the ingredient it names
+    exist, so on a restaurant with no menu yet every row resolves to no row.
+    """
+    conn = FakeConn(recipes=[], known_items={})
+    errors = run(repository.insert_recipes(conn, "r1", [recipe_row("burger", "beef", 0.2)]))
+    assert errors == ["unknown item_id (upload menu first): burger"]
+    assert conn.executed == []
+
+    no_ingredients = FakeConn(recipes=[], known_ingredients={})
+    errors = run(repository.insert_recipes(no_ingredients, "r1", [recipe_row("burger", "beef", 0.2)]))
+    assert errors == ["unknown ingredient_id (upload ingredients first): beef"]
+    assert no_ingredients.executed == []
 
 
 def test_recipe_backdated_before_its_last_change_is_rejected():

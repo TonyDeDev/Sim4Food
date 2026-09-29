@@ -7,7 +7,7 @@ import InventoryOverview from '../components/InventoryOverview.jsx'
 import ForecastOverview from '../components/ForecastOverview.jsx'
 import WhatIfSimulation from '../components/WhatIfSimulation.jsx'
 import ChatWidget from '../components/ChatWidget.jsx'
-import { createRestaurant, fetchUploadStatus, RECORD_FIELDS } from '../utils/api.js'
+import { createRestaurant, deleteRestaurant, fetchUploadStatus, RECORD_FIELDS } from '../utils/api.js'
 
 const TABS = [
   { key: 'home', label: 'Home' },
@@ -16,7 +16,7 @@ const TABS = [
   { key: 'whatif', label: 'What If' },
 ]
 
-export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBusiness, onUploadRecord, onSignOut }) {
+export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBusiness, onDeleteBusiness, onUploadRecord, onSignOut }) {
   const [collapsed, setCollapsed] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [activeId, setActiveId] = useState(businesses[0]?.id ?? null)
@@ -68,6 +68,16 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
 
   function handleEditBusiness(business) {
     setDetailsBusiness(business)
+  }
+
+  // Throws on failure - BusinessDetailsPanel awaits this and stays open to show
+  // the error, so nothing looks deleted that is still there.
+  async function handleDeleteBusiness(id) {
+    await deleteRestaurant(id)
+    onDeleteBusiness(id)
+    // selectedBusiness falls back to businesses[0] on its own, but activeId
+    // would keep naming a business that no longer exists.
+    if (id === activeId) setActiveId(null)
   }
 
   return (
@@ -149,7 +159,14 @@ export default function Dashboard({ user, businesses, onAddBusiness, onUpdateBus
       )}
 
       <AddBusinessModal open={modalOpen} onClose={() => setModalOpen(false)} onSubmit={handleSubmit} />
-      {detailsBusiness && <BusinessDetailsPanel business={detailsBusiness} onClose={() => setDetailsBusiness(null)} onSave={onUpdateBusiness} />}
+      {detailsBusiness && (
+        <BusinessDetailsPanel
+          business={detailsBusiness}
+          onClose={() => setDetailsBusiness(null)}
+          onSave={onUpdateBusiness}
+          onDelete={handleDeleteBusiness}
+        />
+      )}
     </div>
   )
 }
