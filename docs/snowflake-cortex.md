@@ -116,12 +116,12 @@ This is the setup that works on the team's account (run in a Snowsight SQL works
 In `backend/.env` (never commit it):
 
 ```
-SNOWFLAKE_ACCOUNT=guvzzec-ss98777
+SNOWFLAKE_ACCOUNT=<org>-<account>
 SNOWFLAKE_PAT=<programmatic access token>
 CORTEX_MODEL=claude-sonnet-4-5
 ```
 
-- `SNOWFLAKE_ACCOUNT` is `<org>-<account>`: the Snowsight URL `app.snowflake.com/guvzzec/ss98777/` gives `guvzzec-ss98777`.
+- `SNOWFLAKE_ACCOUNT` is `<org>-<account>`: the Snowsight URL `app.snowflake.com/<org>/<account>/` gives `<org>-<account>`.
   Underscores are turned into hyphens automatically, as Snowflake URLs require.
 - Without `SNOWFLAKE_ACCOUNT` and `SNOWFLAKE_PAT` the routes return 503 and the Forecast tab shows "The AI assistant (Snowflake Cortex) is not set up on this server yet."
 

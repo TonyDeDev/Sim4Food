@@ -109,14 +109,6 @@ form.stack {
   margin-top: 6px;
   min-height: 16px;
 }
-.password-label-row {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-}
-.password-label-row a {
-  font-size: 13px;
-}
 .remember-row {
   display: flex;
   align-items: center;
@@ -145,52 +137,6 @@ form.stack {
 }
 .btn-submit:hover {
   background: var(--deep-green-hover);
-}
-
-.divider {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin: 26px 0 20px;
-}
-.divider .line {
-  flex: 1;
-  height: 1px;
-  background: var(--hairline);
-}
-.divider span {
-  font-size: 13px;
-  color: var(--ink-faint);
-  white-space: nowrap;
-}
-
-.oauth-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
-  gap: 12px;
-  margin-bottom: 26px;
-}
-.oauth-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 11px;
-  border: 1px solid var(--hairline);
-  border-radius: 6px;
-  background: var(--cream);
-}
-.oauth-btn:hover {
-  background: var(--cream-deep);
-}
-.oauth-btn svg {
-  width: 20px;
-  height: 20px;
-}
-
-.signup-note {
-  text-align: center;
-  font-size: 14px;
-  color: var(--ink-soft);
 }
 
 /* OTP screen */
