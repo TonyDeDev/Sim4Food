@@ -53,3 +53,7 @@ __pycache__/
 # trained forecasting models
 backend/models/
 .claude/
+
+# agent guide files (re-created by next dev)
+AGENTS.md
+CLAUDE.md

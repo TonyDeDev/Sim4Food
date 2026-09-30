@@ -4,7 +4,6 @@ Helps independent restaurants cut food waste.
 Upload your sales and purchase records, see what you are wasting, and get a next-week order recommendation per ingredient.
 A what-if view shows what a deal or holiday will do to your stock before you run it.
 
-- **Live app:** https://sim4food.vercel.app
 - **Devpost:** https://devpost.com/software/sim4food
 
 ## Inspiration
@@ -52,21 +51,17 @@ Many of the cafes and restaurants have been here for a long time, and we want to
 
 ## Try it
 
-Use the live app at https://sim4food.vercel.app.
-If it is down or you want to test your own changes, run it locally with the steps below.
-The app always talks to whichever backend `BACKEND_URL` points at, so local runs use your own backend and database and never touch the live one.
+Run the app on your own machine with the steps below.
+The app talks to whichever backend `BACKEND_URL` points at, and locally that is your own backend and database.
 
 ## How we built it
 
 - **Frontend:** Next.js (App Router) and React, plain CSS, in `src/`.
 - **Backend:** Python, FastAPI, XGBoost forecasting, Postgres via `asyncpg`, in `backend/`.
 - **Database:** PostgreSQL on Neon. Schema in `db/schema.sql`.
-- **Optional AI assistant:** Snowflake Cortex, see `docs/snowflake-cortex.md`.
-- **Hosting (optional):** frontend on Vercel, backend on Render.
+- **Optional AI assistant:** Snowflake Cortex.
 
-See `CLAUDE.md` for the architecture and conventions.
-
-## Run it locally (fallback)
+## Run it locally
 
 The steps below run the whole app on your own machine.
 They take about 10 minutes.
@@ -145,23 +140,6 @@ Open http://localhost:3000, create an account on the sign-up page, then load the
 
 Stop a server with Ctrl+C in its terminal.
 
-## Host your own copy (optional)
-
-You do not need this to try the app.
-If you have Vercel and Render accounts, you can deploy your own copy.
-The frontend and backend deploy separately, because the Python backend does not fit Vercel's function time limits.
-
-1. **Backend on Render:** create a Blueprint from this repo, `render.yaml` defines the service (root directory `backend`).
-   Set `POSTGRES_URL` to your Neon connection string.
-   `SNOWFLAKE_ACCOUNT` and `SNOWFLAKE_PAT` are optional.
-   Check that `https://<your-service>.onrender.com/openapi.json` loads.
-   On the free plan the service sleeps, so the first request can take about a minute.
-2. **Frontend on Vercel:** import the repo and set two environment variables.
-   - `POSTGRES_URL`: the same Neon connection string.
-   - `BACKEND_URL`: the Render URL from step 1, for example `https://<your-service>.onrender.com`.
-     Do not use the Vercel address here, or every API call comes back as a 404.
-3. Redeploy after changing environment variables, Next.js reads `BACKEND_URL` when it builds.
-
 ## Tests and lint
 
 ```
@@ -172,9 +150,3 @@ python -m pytest
 ```
 npm run lint
 ```
-
-## Docs
-
-- `docs/xgboost-forecasting.md` and `docs/forecast-values.md`: how the forecast works.
-- `docs/snowflake-cortex.md`: optional AI assistant setup.
-- `docs/internal/`: audit notes.

@@ -238,6 +238,23 @@ async def insert_recipes(conn: asyncpg.Connection, restaurant_id: str, rows: lis
     return errors
 
 
+async def _clear_keys(
+    conn: asyncpg.Connection, table: str, key_column: str, restaurant_id: str, keys: list[tuple]
+) -> None:
+    """Deletes stored rows for the (item, date) pairs present in the file.
+
+    Makes re-uploading a file idempotent: the file replaces what it covers
+    instead of stacking a second copy that inflates history and shifts forecasts.
+    `table` and `key_column` are internal constants, never user input.
+    """
+    unique = list(set(keys))
+    await conn.execute(
+        f"DELETE FROM {table} t USING unnest($2::uuid[], $3::date[]) AS k(id, d) "
+        f"WHERE t.restaurant_id = $1 AND t.{key_column} = k.id AND t.date = k.d",
+        restaurant_id, [k[0] for k in unique], [k[1] for k in unique],
+    )
+
+
 async def insert_sales(conn: asyncpg.Connection, restaurant_id: str, rows: list[dict]) -> list[str]:
     menu_item_map = await _id_map(conn, "menu_items", restaurant_id)
     errors = []
@@ -253,6 +270,7 @@ async def insert_sales(conn: asyncpg.Connection, restaurant_id: str, rows: list[
         ))
 
     if records:
+        await _clear_keys(conn, "sales", "menu_item_id", restaurant_id, [(r[1], r[2]) for r in records])
         await conn.executemany(
             """
             INSERT INTO sales (restaurant_id, menu_item_id, date, qty_sold, avg_price)
@@ -278,6 +296,7 @@ async def insert_purchases(conn: asyncpg.Connection, restaurant_id: str, rows: l
         ))
 
     if records:
+        await _clear_keys(conn, "purchases", "ingredient_id", restaurant_id, [(r[1], r[2]) for r in records])
         await conn.executemany(
             """
             INSERT INTO purchases (restaurant_id, ingredient_id, date, qty, unit_cost, total)
@@ -305,6 +324,7 @@ async def insert_inventory_counts(conn: asyncpg.Connection, restaurant_id: str, 
     if not records:
         return errors
 
+    await _clear_keys(conn, "inventory_counts", "ingredient_id", restaurant_id, [(r[1], r[2]) for r in records])
     await conn.executemany(
         """
         INSERT INTO inventory_counts (restaurant_id, ingredient_id, date, qty_on_hand, source)

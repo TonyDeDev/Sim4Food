@@ -183,3 +183,25 @@ def test_recipe_backdated_before_its_last_change_is_rejected():
     errors = run(repository.insert_recipes(conn, "r1", [recipe_row("burger", "beef", 0.3, effective_date="2026-04-01")]))
     assert len(errors) == 1 and "earlier than its last change" in errors[0]
     assert conn.executed == []
+
+
+class DeleteRecordingConn(FakeConn):
+    async def execute(self, sql, *args):
+        self.executed.append((" ".join(sql.split()), [args]))
+
+
+def test_sales_reupload_clears_matching_rows_before_inserting():
+    conn = DeleteRecordingConn()
+    rows = [{"item_id": "burger", "date": "2025-01-06", "qty_sold": "5", "avg_price": "9"}] * 2
+    assert run(repository.insert_sales(conn, "r1", rows)) == []
+    kinds = [sql.split()[0] for sql, _ in conn.executed]
+    assert kinds == ["DELETE", "INSERT"]
+    delete_args = conn.executed[0][1][0]
+    assert list(delete_args[1]) == ["m-burger"], "duplicate keys in one file are cleared once"
+
+
+def test_purchases_reupload_clears_matching_rows_before_inserting():
+    conn = DeleteRecordingConn()
+    rows = [{"ingredient_id": "beef", "date": "2025-01-06", "qty": "5", "unit_cost": "10", "total": "50"}]
+    assert run(repository.insert_purchases(conn, "r1", rows)) == []
+    assert [sql.split()[0] for sql, _ in conn.executed] == ["DELETE", "INSERT"]
